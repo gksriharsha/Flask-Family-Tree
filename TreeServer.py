@@ -1,5 +1,6 @@
+from Tree.Utils.GremlinFunction import injectFunctions
+from Tree.relations.relation_routes import *
 from Tree.people.people_routes import *
-from Tree.location.location_routes import add_location, get_location
 
 @app.route('/')
 def hello_world():
@@ -34,9 +35,23 @@ def query_locations():
 
 @app.route('/query/fetch_lastNames', methods=['GET'])
 def get_lastNames():
-    lastnames = g.V().hasLabel('Person').values('Lastname').toList()
-    print(lastnames)
-    return json.dumps({'Message': 'Fetched all the lastnames', 'Result': lastnames}), 200, {
+    lastnames = g.V().hasLabel('Person').values('Lastname').toSet()
+    return json.dumps({'Message': 'Fetched all the lastnames', 'Result': list(lastnames)}), 200, {
+        'ContentType': 'application/json'}
+
+
+@app.route('/spoc', methods=['GET']) # This is a testing end point. Should be removed in the final version.
+def spoc():
+    cli = client.Client('ws://localhost:8182/gremlin', 'g')
+    query_string = "relationship(g, 28760, 4144)"
+    result_set = cli.submit(query_string, request_options={'evaluationTimeout': 1000})
+    future_results = result_set.all()
+    try:
+        results = future_results.result()
+        print(results)
+    except:
+        injectFunctions(cli)
+    return json.dumps({'Message': 'Fetched all the lastnames'}), 200, {
         'ContentType': 'application/json'}
 
 

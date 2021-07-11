@@ -1,4 +1,5 @@
 from Tree.model.Event import Event
+from Tree.model.Occupation import Occupation
 
 
 class Person:
@@ -12,7 +13,7 @@ class Person:
         Parameters
         ----------
         Firstname : str
-        Date is stored as a string in dd/mm/yyyy format.
+        Date is stored as a string in yyyy-mm-dd format.
         Gender : str
         Gender is stored as a string
         Lastname : str
@@ -38,7 +39,7 @@ class Person:
 
     @birth.setter
     def birth(self, value):
-        if isinstance(value,Event):
+        if isinstance(value, Event):
             self.Birth = value
 
     @property
@@ -56,22 +57,25 @@ class Person:
         gremlinDictionary.update({'Alive': self.Alive})
         gremlinDictionary.update({'Firstname': self.Firstname})
         gremlinDictionary.update({'Lastname': self.Lastname})
-        if self.Occupation:
-            gremlinDictionary.update({'Occupation': self.Occupation})
+        if self.Occupation is not None:
+            gremlinDictionary.update({'Occupation': str(Occupation(Organization=self.Occupation.Organization,
+                                                                   Job=self.Occupation.Job,
+                                                                   Start_year=self.Occupation.Start_year,
+                                                                   End_year=self.Occupation.End_year))})
         if self.Birth is not None:
             if self.Birth.Location is not None:
-                gremlinDictionary.update({'Place_of_birth': self.Birth.Location['ID']})
+                gremlinDictionary.update({'Place_of_Birth': self.Birth.Location})
             if self.Birth.Date is not None:
-                gremlinDictionary.update({'Date_of_birth': self.Birth.Date})
+                gremlinDictionary.update({'Date_of_Birth': self.Birth.Date})
             if self.Birth.Time is not None:
-                gremlinDictionary.update({'Time_of_birth': self.Birth.Time})
+                gremlinDictionary.update({'Time_of_Birth': self.Birth.Time})
         if self.Death is not None:
             if self.Death.Location is not None:
-                gremlinDictionary.update({'Place_of_death':self.Death.Location['ID']})
+                gremlinDictionary.update({'Place_of_Death': self.Death.Location})
             if self.Death.Date is not None:
-                gremlinDictionary.update({'Date_of_death':self.Death.Date})
+                gremlinDictionary.update({'Date_of_Death': self.Death.Date})
             if self.Death.Time is not None:
-                gremlinDictionary.update({'Time_of_death':self.Death.Time})
+                gremlinDictionary.update({'Time_of_Death': self.Death.Time})
         return gremlinDictionary
 
     @staticmethod
@@ -87,40 +91,41 @@ class Person:
             p.Lastname = attributes.pop('Lastname')
         if 'Occupation' in attributes.keys():
             p.Occupation = attributes.pop('Occupation')
-        if any('birth' in str(x) for x in  attributes.keys()):
+        if any('birth' in str(x) for x in attributes.keys()):
             e = Event()
             try:
-                e.Date = attributes.pop('Date_of_birth')
+                e.Date = attributes.pop('Date_of_Birth')
             except:
                 pass
             try:
-                e.Time = attributes.pop('Time_of_birth')
+                e.Time = attributes.pop('Time_of_Birth')
             except:
                 pass
             try:
-                e.Location = attributes.pop('Place_of_birth')
+                e.Location = attributes.pop('Place_of_Birth')
             except:
                 pass
             p.birth = e
         if 'death' in attributes.keys():
             e = Event()
             try:
-                e.Date = attributes.pop('Date_of_death')
+                e.Date = attributes.pop('Date_of_Death')
             except:
                 pass
             try:
-                e.Time = attributes.pop('Time_of_death')
+                e.Time = attributes.pop('Time_of_Death')
             except:
                 pass
             try:
-                e.Location = attributes.pop('Place_of_death')
+                e.Location = attributes.pop('Place_of_Death')
             except:
                 pass
             p.Death = e
         return p
 
+
 if __name__ == '__main__':
-    p = Person( Gender='Male', Lastname='Gundu', Alive=True)
+    p = Person(Gender='Male', Lastname='Gundu', Alive=True)
     print(list(p.__dict__.values()))
     if None in list(p.__dict__.values()):
         print('None')

@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from gremlin_python.process.traversal import T
 
 
@@ -36,7 +37,7 @@ def convertFromNode(node):
 
     Returns
     -------
-
+    This returns a dictionary of a particular node.
     """
     node_dictionary = {}
     for (k, v) in node.items():

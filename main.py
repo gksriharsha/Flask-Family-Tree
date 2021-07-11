@@ -1,8 +1,5 @@
-from gremlin_python import statics
-from gremlin_python.structure.graph import Graph
-from gremlin_python.process.traversal import T
-from gremlin_python.process.graph_traversal import __, bothE, has
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+from gremlin_python.structure.graph import Graph
 
 graph = Graph()
 connection = DriverRemoteConnection('ws://localhost:8182/gremlin', 'g')
@@ -23,4 +20,3 @@ hercules = g.V().has('name', 'hercules').next()
 # print(len(list_offsprings))
 # print(list(vert.items()))
 # print(v for (k,v) in list(vert.items()) if 'id' in k )
-
