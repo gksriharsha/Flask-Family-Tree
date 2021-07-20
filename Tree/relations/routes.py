@@ -1,11 +1,13 @@
 import json
-
-from Tree import app, request
+from flask import Blueprint
+from Tree import request
 from Tree.Utils.RelationReducer import reduce
 from Tree.relations.gremlin_Interface import *
 
+relations = Blueprint('relations', __name__)
 
-@app.route('/search/relation', methods=['POST'])
+
+@relations.route('/search/relation', methods=['POST'])
 def search_relation():
     req_dict = eval(request.data.decode('ascii'))
     path = searchRelation(start_id=eval(str(req_dict['start_id'])), end_id=eval(str(req_dict['end_id'])))

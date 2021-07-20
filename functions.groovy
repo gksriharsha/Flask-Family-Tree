@@ -98,6 +98,15 @@ def adoption(g, parent1, parent2, child, Map kwargs =[:]) {
         if (kwargs.Lastname) {
             g.V(child).property('Lastname', kwargs.Lastname).next()
         }
+        if(kwargs.Father_lastname){
+            if(g.V(parent1).values('Gender').next() == 'Male'){
+                g.V(child).property('Lastname',g.V(parent1).values('Lastname').next()).next()
+            }
+            else{
+                g.V(child).property('Lastname',g.V(parent2).values('Lastname').next()).next()
+            }
+            
+        }
     }
     if (parent2) {
         g.V(parent2).addE('Mother_Of*').to(V(child)).next()
@@ -108,70 +117,63 @@ def adoption(g, parent1, parent2, child, Map kwargs =[:]) {
             g.V(child).addE('Daughter_Of*').to(V(parent2)).next()
         }
     }
-    siblings(adopted = true)
+    siblings(g,parent1,parent2,child)
 }
-def siblings_relation(siblings, adopted) {
+def siblings_relation(g,sibling,siblings) {
     addition = ''
-    if (adopted) {
+    if (g.V(sibling).values('Adopted').next() == 'Yes') {
         addition = '*'
     }
-    for (sibling in siblings) {
-        gender = g.V(sibling).values('Gender').next()
-        if (gender == 'Male') {
-            for (s in siblings) {
-                if (s != sibling) {
-                    g.V(sibling).addE('Brother_Of' + addition).to(V(s)).next()
-                }
+    gender = g.V(sibling).values('Gender').next()
+    if (gender == 'Male') {
+        for (s in siblings) {
+            if (s != sibling) {
+                g.V(sibling).addE('Brother_Of' + addition).to(V(s)).next()
             }
         }
-        else {
-            for (s in siblings) {
-                if (s != sibling) {
-                    g.V(sibling).addE('Sister_Of' + addition).to(V(s)).next()
-                }
+    }
+    else {
+        for (s in siblings) {
+            if (s != sibling) {
+                g.V(sibling).addE('Sister_Of' + addition).to(V(s)).next()
             }
         }
     }
 }
-def siblings(g, father, mother, adopted=false) {
-    if (father && mother && g.V(father).out('Husband_Of').values(T.ID).next() == mother) {
-        if (adopted) {
-            siblings = g(mother).out('Mother_Of*').values(T.ID).fold().next()
-            siblings_relation(siblings, true)
+def siblings(g, parent1, parent2,child) {
+
+    // parent1 is usually the father and parent 2 is usually the mother.
+    
+    if (parent1 && parent2) { // Both parents exist
+
+        if ((g.V(parent1).out('Husband_Of').values(T.ID).next() == parent2) ||
+        g.V(parent2).out('Husband_Of').values(T.ID).next() == parent1) {   // Both parents are married.
+        
+            siblings = g(parent2).out('Mother_Of*','Father_Of*').values(T.ID).fold().next()
+            siblings.addAll(g(parent2).out('Mother_Of','Father_Of').values(T.ID).fold().next())
+            siblings_relation(g,child,siblings)
             return
-        }
-        siblings = g(mother).out('Mother_Of').values(T.ID).fold().next()
-        siblings_relation(siblings, false)
-        return
     }
-    if (father && mother) { // Father and mother exist but are not married.
-        addition = ''
-        if (adopted) {
-            addition = '*'
-        }
-        siblings1 = g.V(mother).out('Mother_Of' + addition).values(T.ID).fold().next()
-        siblings2 = g.V(father).out('Father_Of' + addition).values(T.ID).fold().next()
+        siblings1 = g.V(parent2).out('Mother_Of','Father_Of').values(T.ID).fold().next()
+        siblings2 = g.V(parent1).out('Father_Of','Mother_Of').values(T.ID).fold().next()
         siblings = siblings1.intersect(siblings2)
-        siblings_relation(siblings, adopted)
+        siblings_relation(child,siblings)
         return
     }
-    if (father) { //Only father and adopted a child.
-        addition = ''
-        if (adopted) {
-            addition = '*'
+    else if (parent1 || parent2) { //Only father or mother adopted a child.
+        if(parent1)
+        {
+            siblings = g.V(parent1).out('Father_Of','Mother_of').values(T.ID).fold().next()
         }
-        siblings2 = g.V(father).out('Father_Of' + addition).values(T.ID).fold().next()
-        siblings_relation(siblings, adopted)
-        return
+        else
+        {
+            siblings = g.V(parent2).out('Father_Of','Mother_of').values(T.ID).fold().next()
+        }
+        siblings_relation(child,siblings)
+        return 
     }
-    if (mother) { // Only mother and adopted a child
-        addition = ''
-        if (adopted) {
-            addition = '*'
-        }
-        siblings2 = g.V(mother).out('Mother_Of' + addition).values(T.ID).fold().next()
-        siblings_relation(siblings, adopted)
-        return
+    else{
+        // Throw an error because both mother and father do not exist.
     }
 }
 def marriage(g, person1, person2) {
@@ -228,22 +230,12 @@ def marriage(g, person1, person2) {
 def divorce(g,person1,person2){
     if(g.V(person1).out('Husband_Of','Wife_Of').values(T.ID).next() == person2){
         g.E(g.V(person1).outE('Husband_Of','Wife_Of').id().next()).drop().next()
+
+        g.V(person1).addE('ex-spouse_Of').to(V(person1)).next()
+        g.V(person2).addE('ex-spouse_Of').to(V(person2)).next()
     }
-    g.V(person1).addE('ex-spouse_Of').to(V(person1)).next()
-    g.V(person2).addE('ex-spouse_Of').to(V(person2)).next()
 }
 
-// class AgeException extends Exception {
-//     String s1;
-//     AgeException(String s2) {
-//         s1 = s2
-//     }
-//     @Override
-//     String toString() {
-//         return('The exception is ' + s1)
-//     }
-
-// }
 def ageDifference(g, person1, person2) {
     DOB1 = g.V(person1).values('Date_of_birth').next()
     DOB2 = g.V(person2).values('Date_of_birth').next()

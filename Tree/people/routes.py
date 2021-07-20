@@ -1,12 +1,13 @@
 import json
 
-from flask import request
+from flask import request, Blueprint
 
-from Tree import app
 from Tree.Utils.Dictionary_converter import *
 from Tree.model.Event import Event
 from Tree.people.gremlin_Interface import *
 from Tree.relations.gremlin_Interface import *
+
+people = Blueprint('people', __name__)
 
 
 def create_person_object(req_dict):
@@ -26,7 +27,7 @@ def create_person_object(req_dict):
     return p
 
 
-@app.route('/add/person', methods=['POST'])
+@people.route('/add/person', methods=['POST'])
 def add_person_endpoint():
     req_dict = eval(request.data.decode('ascii'))
     print('Request Dictionary is ---', req_dict)
@@ -48,7 +49,7 @@ def add_person_endpoint():
                {'ContentType': 'application/json'}
 
 
-@app.route('/modify/person', methods=['POST'])
+@people.route('/modify/person', methods=['POST'])
 def modify():
     req_dict = eval(request.data.decode('ascii'))
     print('Request Dictionary is ---', req_dict)
@@ -61,7 +62,7 @@ def modify():
            {'ContentType': 'application/json'}
 
 
-@app.route('/relate/people', methods=['POST'])
+@people.route('/relate/people', methods=['POST'])
 def relate():
     req_dict = eval(request.data.decode('ascii'))
 
@@ -104,21 +105,24 @@ def relate():
             q.Birth = e
             req_dict['C']['ID'] = add_person(person=q, return_id=True)
 
-            if marriage(Man_id=req_dict['B']['ID'], Woman_id=req_dict['C']['ID']):
-                if req_dict.get('A').get('Gender') == 'Male':
-                    son(father_id=req_dict['B'].get('ID'), mother_id=req_dict['C'].get('ID'),
-                        son_id=req_dict['A'].get('ID'))
-                    return json.dumps({'Message': 'Successfully added child to the family tree'}), 200, \
-                           {'ContentType': 'application/json'}
-
-                elif req_dict.get('A').get('Gender') == 'Female':
-                    daughter(father_id=req_dict['B'].get('ID'), mother_id=req_dict['C'].get('ID'),
-                             daughter_id=req_dict['A'].get('ID'))
-                    return json.dumps({'Message': 'Successfully added child to the family tree'}), 200, \
-                           {'ContentType': 'application/json'}
+            if marriage(Person1_id=req_dict['B']['ID'], Person2_id=req_dict['C']['ID']):
+                if req_dict.get('Relation') != 'Adoption':
+                    if (not child(parent1_id=eval(str(req_dict['B'].get('ID'))),
+                                  parent2_id=eval(str(req_dict['C'].get('ID'))),
+                                  child_id=eval(str(req_dict['A'].get('ID'))))):
+                        return json.dumps({'Message': 'Unable to add child'}), 400, \
+                               {'ContentType': 'application/json'}
                 else:
-                    return json.dumps({'Message': 'Invalid Gender Information in child module'}), 400, \
-                           {'ContentType': 'application/json'}
+                    if (not Adoption(parent1_id=eval(str(req_dict['B'].get('ID'))),
+                                     parent2_id=eval(str(req_dict['C'].get('ID'))),
+                                     child_id=eval(str(req_dict['A'].get('ID'))))):
+                        return json.dumps({'Message': 'Unable to add child'}), 400, \
+                               {'ContentType': 'application/json'}
+                return json.dumps({'Message': 'Successfully added child to the family tree'}), 200, \
+                       {'ContentType': 'application/json'}
+            else:
+                return json.dumps({'Message': 'Unable to create marriage relation'}), 400, \
+                       {'ContentType': 'application/json'}
 
         if req_dict.get('Relation') == 'Child' or req_dict.get('Relation') == 'Adoption':
             if req_dict.get('Method') == 'Add-Relate':
@@ -132,23 +136,19 @@ def relate():
                 q.Birth = e
                 req_dict['A']['ID'] = add_person(person=q, return_id=True)
 
-                if req_dict['A'].get('Gender') == 'Male':
-                    son(father_id=eval(str(req_dict['B'].get('ID'))), mother_id=eval(str(req_dict['C'].get('ID'))),
-                        son_id=eval(str(req_dict['A'].get('ID'))), adopted=req_dict.get('Relation') == 'Adoption')
-                    return json.dumps({'Message': 'Successfully added child to the family tree'}), 200, \
-                           {'ContentType': 'application/json'}
-                elif req_dict['A'].get('Gender') == 'Female':
-                    daughter(father_id=eval(str(req_dict['B'].get('ID'))), mother_id=eval(str(req_dict['C'].get('ID'))),
-                             daughter_id=eval(str(req_dict['A'].get('ID'))),
-                             adopted=req_dict.get('Relation') == 'Adoption')
-                    return json.dumps({'Message': 'Successfully added child to the family tree'}), 200, \
-                           {'ContentType': 'application/json'}
+                if req_dict.get('Relation') != 'Adoption':
+                    child(parent1_id=eval(str(req_dict['B'].get('ID'))), parent2_id=eval(str(req_dict['C'].get('ID'))),
+                          child_id=eval(str(req_dict['A'].get('ID'))))
                 else:
-                    return json.dumps({'Message': 'Invalid Gender Information in child module'}), 400, \
-                           {'ContentType': 'application/json'}
+                    Adoption(parent1_id=eval(str(req_dict['B'].get('ID'))),
+                             parent2_id=eval(str(req_dict['C'].get('ID'))),
+                             child_id=eval(str(req_dict['A'].get('ID'))))
+
+                return json.dumps({'Message': 'Successfully added child to the family tree'}), 200, \
+                       {'ContentType': 'application/json'}
 
 
-@app.route('/get/person', methods=['POST'])
+@people.route('/get/person', methods=['POST'])
 def get_person():
     req_dict = eval(request.data.decode('ascii'))
 

@@ -1,12 +1,14 @@
 import json
-
-from Tree import app, request, g
+from flask import Blueprint
+from Tree import request, g
 from Tree.Utils.Dictionary_converter import convert2dictionary
 from Tree.location.gremlin_Interface import add_location
 from Tree.model.Location import Location
 
+locations = Blueprint('locations', __name__)
 
-@app.route('/add/location', methods=['POST'])
+
+@locations.route('/add/location', methods=['POST'])
 def add_location_endpoint():
     req_dict = eval(request.data.decode('ascii'))
     location = Location(place=req_dict.get('Place', ''), state=req_dict.get('State'), country=req_dict.get('Country'))
@@ -15,7 +17,7 @@ def add_location_endpoint():
            {'ContentType': 'application/json'}
 
 
-@app.route('/get/location', methods=['POST'])
+@locations.route('/get/location', methods=['POST'])
 def get_location():
     value = eval(request.data.decode('ascii'))
     if 'all' in value.values():

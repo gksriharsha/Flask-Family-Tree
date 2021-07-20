@@ -30,11 +30,11 @@ lastname attribute passed.
 ### Facial Recognition
 
 In this project, [face_recognition](https://pypi.org/project/face-recognition/) library is used for recognizing faces.
-The problem with face recognition in this application is the variation of a face with the change in time. Therefore multiple
-faces should be stored for recognizing the person accurately or confidently. This package also accounts for faces that are 
-captured from a side angle too. It is mentioned that this model is trained for adult faces, therefore children's faces are 
-not accurately predicted. Therefore, the threshold for younger people in the family tree is kept at a much lower value than 
-the default 0.6 . 
+The problem with face recognition in this application is the variation of a face with the change in time. Therefore
+multiple faces should be stored for recognizing the person accurately or confidently. This package also accounts for
+faces that are captured from a side angle too. It is mentioned that this model is trained for adult faces, therefore
+children's faces are not accurately predicted. Therefore, the threshold for younger people in the family tree is kept at
+a much lower value than the default 0.6 .
 
 ## Coding Section
 
@@ -42,8 +42,9 @@ In this section, I will be stating the actual coding implementation of a feature
 if a better approach is known. Major part of the gremlin based logic is being migrated to groovy scripts.
 
 ### Graphs
- 
-To create new graphs, change the keyspace of casssandra.By changing keyspace, we can build this into an application which supports graphs of different people.
+
+To create new graphs, change the keyspace of casssandra.By changing keyspace, we can build this into an application
+which supports graphs of different people.
 
 *clone()* is used to repeat a piece of gremlin functionality again later in the code.
 
@@ -58,7 +59,6 @@ That model of storing information would not allow date of birth because place of
 It appears that there is no native [support](https://github.com/pokitdok/gremlin-python/issues/16) for the **
 gremlinpython** library for updating the vertex properties, therefore the roundabout approach is taken by creating by
 sending the raw query directly to the gremlin server.
-
 
 ## Debuggin Section
 

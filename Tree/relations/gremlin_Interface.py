@@ -19,9 +19,10 @@ def relate_locations(person_id, person: Person):
 
 def marriage(Person1_id, Person2_id):
     cli = client.Client('ws://localhost:8182/gremlin', 'g')
-    query_string = f"relationship({g},{Person1_id} , {Person2_id})"
+    query_string = f"marriage(g,{Person1_id} , {Person2_id})"
     result_set = cli.submit(query_string, request_options={'evaluationTimeout': 1000})
     future_results = result_set.all()
+    cli.close()
     try:
         results = future_results.result()
         return True
@@ -29,7 +30,38 @@ def marriage(Person1_id, Person2_id):
         return False
 
 
+def child(parent1_id, parent2_id, child_id):
+    cli = client.Client('ws://localhost:8182/gremlin', 'g')
+    query_string = f"child(g,{parent1_id} , {parent2_id}, {child_id})"
+    result_set = cli.submit(query_string, request_options={'evaluationTimeout': 1000})
+    future_results = result_set.all()
+    cli.close()
+    try:
+        results = future_results.result()
+        return True
+    except:
+        return False
+
+def Adoption(parent1_id, parent2_id,child_id):
+    cli = client.Client('ws://localhost:8182/gremlin', 'g')
+    query_string = f"adoption(g,{parent1_id} , {parent2_id}, {child_id}, [\"Father_lastname\":true])"
+    result_set = cli.submit(query_string, request_options={'evaluationTimeout': 1000})
+    future_results = result_set.all()
+    cli.close()
+    try:
+        results = future_results.result()
+        return True
+    except:
+        return False
+
 def searchRelation(start_id, end_id):
-    path = g.V(start_id).repeat(__.outE().otherV().dedup()).until(__.has(T.id, end_id)).path().by(
-        __.elementMap()).by(__.elementMap()).next()
-    return path
+    cli = client.Client('ws://localhost:8182/gremlin', 'g')
+    query_string = f"relation(g,{start_id} , {end_id})"
+    result_set = cli.submit(query_string, request_options={'evaluationTimeout': 1000})
+    future_results = result_set.all()
+    paths = ''
+    cli.close()
+
+    paths = future_results.result()
+
+    return paths

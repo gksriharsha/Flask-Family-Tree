@@ -63,7 +63,7 @@ def modify_person(person: Person, ID):
 def retrieve_person(id=None, all=False, search_text=None):
     if all:
         return g.V().hasLabel('Person').elementMap('Firstname', 'DOB', 'Gender').toList()
-    if id is not None :
+    if id is not None:
         Father = None
         Mother = None
         Brother = None

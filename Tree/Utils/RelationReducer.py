@@ -44,7 +44,7 @@ def relation_definition(previous, current, relation_language='Telugu'):
             'Uncle_Of': {'Son_Of', 'Cousin_Of'},
             'Son_Of': {'Son_Of': 'Grandson_Of', 'Wife_Of': 'Daughter in law_Of', 'Daughter_Of': 'Granddaughter_Of',
                        'Brother_Of': 'Son_Of'},
-            'Daughter_Of':{'Husband_Of':'Son in law_Of'},
+            'Daughter_Of': {'Husband_Of': 'Son in law_Of'},
             'Wife_Of': {'Father_Of': 'Father in law_Of', 'Mother_Of': 'Mother in law_Of',
                         'Brother_Of': 'Brother in law_Of', 'Sister_Of': 'Sister in law_Of'}
         }
