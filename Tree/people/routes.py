@@ -5,26 +5,10 @@ from flask import request, Blueprint
 from Tree.Utils.Dictionary_converter import *
 from Tree.model.Event import Event
 from Tree.people.gremlin_Interface import *
+from Tree.people.people_Service import create_person_object, retrieve_person_service
 from Tree.relations.gremlin_Interface import *
 
 people = Blueprint('people', __name__)
-
-
-def create_person_object(req_dict):
-    p = Person(Firstname=req_dict['Firstname'],
-               Lastname=req_dict['Lastname'],
-               Gender=req_dict.get('Gender'),
-               Alive=req_dict.get('Alive', ''))
-    p.Occupation = req_dict.get('Occupation')
-    e = Event()
-    if 'Location' in req_dict.get('Birth').keys():
-        e.Location = req_dict.get('Birth')['Location']
-    if 'Time' in req_dict.get('Birth').keys():
-        e.Time = req_dict.get('Birth')['Time']
-    if 'Date' in req_dict.get('Birth').keys():
-        e.Date = req_dict.get('Birth')['Date']
-    p.Birth = e
-    return p
 
 
 @people.route('/add/person', methods=['POST'])
@@ -64,6 +48,7 @@ def modify():
 
 @people.route('/relate/people', methods=['POST'])
 def relate():
+    print(request.data)
     req_dict = eval(request.data.decode('ascii'))
 
     if req_dict.get('Relation') == 'Marriage':
@@ -157,23 +142,11 @@ def get_person():
             return json.dumps({'Message': "ID is invalid"}), 400, \
                    {'ContentType': 'application/json'}
 
-        ret_value, Father, Mother, Brother, Sister, Child, Spouse = retrieve_person(id=eval(req_dict['ID']))
-        relations = {}
-        if Father is not None:
-            relations.update({'Father': convert2dictionary(Father)})
-        if Mother is not None:
-            relations.update({'Mother': convert2dictionary(Mother)})
-        if Brother is not None:
-            relations.update({'Brother': convert2dictionary(Brother)})
-        if Sister is not None:
-            relations.update({'Sister': convert2dictionary(Sister)})
-        if Child is not None:
-            relations.update({'Children': convert2dictionary(Child)})
-        if Spouse is not None:
-            relations.update({'Spouse': convert2dictionary(Spouse)})
+        relations, person_dictionary = retrieve_person_service(eval(req_dict['ID']))
         return json.dumps({'Message': 'Person found',
                            'Data': json.loads(
-                               json.dumps(Person.createPersonObject(ret_value), default=lambda o: o.__dict__)),
+                               json.dumps(Person.createPersonObject(person_dictionary),
+                                          default=lambda o: o.__dict__)),
                            'Relations': relations}), 200, \
                {'ContentType': 'application/json'}
 

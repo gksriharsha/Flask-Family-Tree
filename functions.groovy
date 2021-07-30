@@ -13,7 +13,7 @@ def relation(g, from, to) {
        
         /* If the shortest path between the final person and the first person has an
         option of adoption then it will be included as a secondary relation*/
-        path = g.V(from).repeat(outE().otherV().dedup()).until(has(id, to)).path()\
+        path = g.V(from).repeat(inE().otherV().dedup()).until(has(id, to)).path()\
         .by('Firstname').by(label).fold().next()
 
         temp = g.V(from).repeat(out().dedup()).until(has(id,parentID)).path().by(T.ID).next().collect()
@@ -30,17 +30,17 @@ def relation(g, from, to) {
         
         if (count <= 1)
         {
-            temp = g.V(from).repeat(outE().otherV().dedup()).until(has(id,parentID)).path().by('Firstname').by(label)\
+            temp = g.V(from).repeat(inE().otherV().dedup()).until(has(id,parentID)).path().by('Firstname').by(label)\
             .next().collect()
             temp.removeLast()
             secondPath = temp + \
-            g.V(parentID).repeat(outE().otherV().dedup()).until(has(id, to)).path().by('Firstname').by(label).next()
+            g.V(parentID).repeat(inE().otherV().dedup()).until(has(id, to)).path().by('Firstname').by(label).next()
             path << secondPath
         }
         path[0] = path[0].collect()
     }
     else {
-        path = g.V().has(id, from).repeat(outE().otherV().dedup()).until(has(id, to)).path()\
+        path = g.V().has(id, from).repeat(inE().otherV().dedup()).until(has(id, to)).path()\
         .by('Firstname').by(label).next()
     }
 
@@ -57,17 +57,17 @@ def relation(g, from, to) {
             significantOther = g.V(person).out('Husband_Of', 'Wife_Of').values(T.ID).next()
             relationshipID = g.V(person).outE('Husband_Of', 'Wife_Of').id().next()
             if (people.contains(significantOther)) {
-                multiplePath = g.V(from).repeat(outE().not(has(id, relationshipID)).otherV().dedup())\
+                multiplePath = g.V(from).repeat(inE().not(has(id, relationshipID)).otherV().dedup())\
                 .until(has(id, to)).path().by('Firstname').by(label).next()
                 people = people.minus([person, significantOther])
             }
             else {
-                multiplePath = g.V(from).repeat(outE().otherV().not(has(id,significantOther)).dedup())\
+                multiplePath = g.V(from).repeat(inE().otherV().not(has(id,significantOther)).dedup())\
                                 .until(has(id, person)).path()\
                                 .by('Firstname').by(label).next().collect()
                 multiplePath.removeLast()
-                multiplePath = multiplePath + g.V(person).outE('Husband_Of', 'Wife_Of')\
-                                .repeat(outE().otherV().dedup()).until(has(id, to)).path().by('Firstname').by(label)\
+                multiplePath = multiplePath + g.V(person).inE('Husband_Of', 'Wife_Of')\
+                                .repeat(inE().otherV().dedup()).until(has(id, to)).path().by('Firstname').by(label)\
                                 .next()
                 people = people.minus([person])
             }
@@ -78,6 +78,11 @@ def relation(g, from, to) {
     // TODO: Add logic to find out mixed cases.
     // If there is a adoption in a path which has marriage in the inner circle or viceversa.
     return path
+}
+def shortestPath(g,from,to){
+    path = g.V().has(id, from).repeat(inE().otherV().dedup()).until(has(id, to)).path()\
+        .by('Firstname').by(label).next()
+    return path 
 }
 def adoption(g, parent1, parent2, child, Map kwargs =[:]) {
     gender = g.V(child).values('Gender').next()
@@ -200,7 +205,7 @@ def marriage(g, person1, person2) {
     }
     marriageID = g.V(person1).outE('Husband_Of', 'Wife_Of').id().next()
 
-    cousinMarraige = g.V(person1).repeat(outE('Father_Of', 'Son_Of', 'Mother_Of', 'Daughter_Of',
+    cousinMarraige = g.V(person1).repeat(inE('Father_Of', 'Son_Of', 'Mother_Of', 'Daughter_Of',
                                                     'Wife_Of','Husband_Of','Son_Of*','Daughter_Of*',
                                                     'Father_Of*', 'Mother_Of*').not(has(id, marriageID)).otherV()\
                                                     .dedup()).until(has(id, person2))
@@ -230,6 +235,7 @@ def marriage(g, person1, person2) {
 def divorce(g,person1,person2){
     if(g.V(person1).out('Husband_Of','Wife_Of').values(T.ID).next() == person2){
         g.E(g.V(person1).outE('Husband_Of','Wife_Of').id().next()).drop().next()
+        g.E(g.V(person2).outE('Husband_Of','Wife_Of').id().next()).drop().next()
 
         g.V(person1).addE('ex-spouse_Of').to(V(person1)).next()
         g.V(person2).addE('ex-spouse_Of').to(V(person2)).next()

@@ -1,13 +1,13 @@
 from Tree.model.Event import Event
 from Tree.model.Occupation import Occupation
-
+from gremlin_python.process.traversal import T
 
 class Person:
     """
         This class is used for performing person based operations
     """
 
-    def __init__(self, Firstname: str = None, Gender=None, Lastname=None, Alive=False) -> object:
+    def __init__(self, Firstname: str = None, Gender=None, Lastname=None, Alive=None) -> object:
         """
 
         Parameters
@@ -17,12 +17,13 @@ class Person:
         Gender : str
         Gender is stored as a string
         Lastname : str
-        Alive: bool
+        Alive: str
 
         Returns
         -------
         None
         """
+        self.ID = None
         self.Firstname = Firstname
         self.Lastname = Lastname
         self.Gender = Gender
@@ -81,6 +82,7 @@ class Person:
     @staticmethod
     def createPersonObject(attributes):
         p = Person()
+        p.ID = attributes.pop(T.id)
         if 'Gender' in attributes.keys():
             p.Gender = attributes.pop('Gender')
         if 'Alive' in attributes.keys():
@@ -94,30 +96,30 @@ class Person:
         if any('birth' in str(x) for x in attributes.keys()):
             e = Event()
             try:
-                e.Date = attributes.pop('Date_of_Birth')
+                e.Date = attributes.pop('Date_of_birth')
             except:
                 pass
             try:
-                e.Time = attributes.pop('Time_of_Birth')
+                e.Time = attributes.pop('Time_of_birth')
             except:
                 pass
             try:
-                e.Location = attributes.pop('Place_of_Birth')
+                e.Location = attributes.pop('Place_of_birth')
             except:
                 pass
             p.birth = e
         if 'death' in attributes.keys():
             e = Event()
             try:
-                e.Date = attributes.pop('Date_of_Death')
+                e.Date = attributes.pop('Date_of_death')
             except:
                 pass
             try:
-                e.Time = attributes.pop('Time_of_Death')
+                e.Time = attributes.pop('Time_of_death')
             except:
                 pass
             try:
-                e.Location = attributes.pop('Place_of_Death')
+                e.Location = attributes.pop('Place_of_death')
             except:
                 pass
             p.Death = e

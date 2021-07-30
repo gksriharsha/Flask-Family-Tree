@@ -1,6 +1,6 @@
 import json
-from flask import Blueprint
-from Tree import request, g
+from flask import Blueprint, request
+from Tree import g
 from Tree.Utils.Dictionary_converter import convert2dictionary
 from Tree.location.gremlin_Interface import add_location
 from Tree.model.Location import Location

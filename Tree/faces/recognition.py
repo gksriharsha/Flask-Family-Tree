@@ -1,10 +1,15 @@
+import base64
+import io
+import math
+import uuid
+import numpy as np
 import face_recognition as FR
 import json, os
 import textwrap
 import numpy
 from ttictoc import tic, toc
 from PIL import Image, ImageDraw, ImageFont
-
+from flask import current_app
 from Tree import g
 
 
@@ -18,20 +23,27 @@ def number_of_faces(img_path):
 
 def open_encodings_dict():
     dictionary = {}
-    if os.path.exists(os.path.abspath('Tree/people/faces/known/faces.json')):
-        with open(os.path.abspath('Tree/people/faces/known/faces.json'), 'r') as json_file:
+    if os.path.exists(current_app.config['FACES_JSON_PATH']):
+        with open(current_app.config['FACES_JSON_PATH'], 'r') as json_file:
             d = json.load(json_file)
             dictionary = {eval(k): v for (k, v) in d.items()}
     return dictionary
 
 
 def save_encodings_dict(face_encoding_dictionary):
-    with open(os.path.abspath('Tree/people/faces/known/faces.json'), 'w+') as json_file:
-        face_encoding_dictionary = {str(k): v for (k, v) in face_encoding_dictionary.items()}
-        json.dump(face_encoding_dictionary, json_file)
+    if os.path.exists(current_app.config['FACES_JSON_PATH']):
+        for item in open_encodings_dict().items():
+            face_encoding_dictionary.update({item[0]:item[1]})
+        with open(current_app.config['FACES_JSON_PATH'], 'w') as json_file:
+            face_encoding_dictionary = {str(k): v for (k, v) in face_encoding_dictionary.items()}
+            json.dump(face_encoding_dictionary, json_file, indent=4)
+    else:
+        with open(current_app.config['FACES_JSON_PATH'], 'w+') as json_file:
+            face_encoding_dictionary = {str(k): v for (k, v) in face_encoding_dictionary.items()}
+            json.dump(face_encoding_dictionary, json_file, indent=4)
 
 
-def draw_boxes(img_path):
+def draw_boxes(img_path, relatives_dictionary=None,encoded_Image=False,numbering=False ):
     img = FR.load_image_file(img_path)
 
     face_locations = FR.face_locations(img)
@@ -41,67 +53,103 @@ def draw_boxes(img_path):
 
     draw = ImageDraw.Draw(pil_image)
 
-    font = ImageFont.truetype("~/usr/share/fonts/truetype/freefont/FreeMonoBold.ttf", 14)
+    font = ImageFont.truetype(current_app.config['FONT_PATH'], current_app.config['FONT_SIZE'])
     unknown_face_locations = []
+    known_face_location_tuples = []
+    face_number = 0
     for i, ((top, right, bottom, left), face_encoding) in enumerate(zip(face_locations, face_encodings)):
 
         vertex_id = recognize_encoding(face_encoding)
 
         if vertex_id != -1:
-            i = g.V(vertex_id).values('Firstname').next() + ' ' + g.V(vertex_id).values('Lastname').next()
+            if relatives_dictionary is None:
+                i = g.V(vertex_id).values('Firstname').next() + ' ' + g.V(vertex_id).values('Lastname').next()
+                known_face_location_tuples.append(((top, right, bottom, left), vertex_id, i))
+            else:
+                if vertex_id in relatives_dictionary.keys():
+                    i = g.V(vertex_id).values('Nickname')
+                    if i.hasNext():
+                        i = i.next() + '-' + relatives_dictionary[vertex_id]
+                    else:
+                        try:
+                            i = relatives_dictionary[vertex_id]
+                        except KeyError:
+                            i = ''
+                else:
+                    i = ''
         else:
-            unknown_face_locations.append([(top, right, bottom, left), i])
+            unknown_face_locations.append([(top, right, bottom, left), face_number+1])
 
-        draw.rectangle(((left - 10, top - 10), (right + 10, bottom + 10)), outline=(255, 255, 0))
+        if i != '':
+            if isinstance(i,int):
+                if not numbering:
+                    continue
+                else:
+                    face_number = face_number + 1
+                    i = face_number
+            if i == 'Me':
+                draw.rectangle(((left - 15, top - 15), (right + 15, bottom + 15)), outline=(95, 31, 211))
+            else:
+                draw.rectangle(((left - 15, top - 15), (right + 15, bottom + 15)), outline=(255, 255, 0))
 
-        text_width, text_height = draw.textsize(str(i))
-        lines = textwrap.wrap(str(i), width=12)
-        offset = 0
-        for line in lines:
-            draw.rectangle(
-                ((left - 10, bottom + 10 + offset - text_height - 10 + 5), (right + 10, bottom + 20 + offset)),
-                fill=(255, 255, 0),
-                outline=(255, 255, 0))
-            draw.text((left - 10 + 6, bottom + 10 - text_height - 5 + offset), line, fill=(0, 0, 0),
-                      font=font)
-            offset += font.getsize(line)[1]
+            text_width, text_height = draw.textsize(str(i))
+            lines = textwrap.wrap(str(i), width=math.floor((right - left + 30) / 8))
+            offset = 0
+            for line in lines:
+                if i == 'Me':
+                    draw.rectangle(
+                        ((left - 15, bottom + 15 + offset - text_height - 10 + 5), (right + 15, bottom + 25 + offset)),
+                        fill=(95,31,211),
+                        outline=(95,31,211))
+                    draw.text((left - 15 + 6, bottom + 15 - text_height - 5 + offset), line, fill=(255, 255, 255),
+                              font=font)
+                    offset += font.getsize(line)[1]
+                else:
+                    draw.rectangle(
+                        ((left - 15, bottom + 15 + offset - text_height - 10 + 5), (right + 15, bottom + 25 + offset)),
+                        fill=(255, 255, 0),
+                        outline=(255, 255, 0))
+                    draw.text((left - 15 + 6, bottom + 15 - text_height - 5 + offset), line, fill=(0, 0, 0),
+                              font=font)
+                    offset += font.getsize(line)[1]
 
     del draw
+    random_value = uuid.uuid4()
+    filename = current_app.config['UPLOAD_IMAGE_PATH'] + f'/{random_value}.jpg'
+    pil_image.save(os.path.abspath(filename))
+    pil_image.close()
+    if encoded_Image:
+        img2 = Image.fromarray(FR.load_image_file(filename).astype('uint8'))
+        rawBytes = io.BytesIO()
+        img2.save(rawBytes, "JPEG")
+        rawBytes.seek(0)
+        img_base64 = base64.b64encode(rawBytes.read())
+        if numbering:
+            return random_value, filename, img_base64, unknown_face_locations
+        else:
+            return random_value, filename, img_base64, known_face_location_tuples
 
-    pil_image.show()
-    return unknown_face_locations
 
-
-def relate_person_to_face(vertex_id=None, image_path=None, vertex_id_map={}):
+def relate_person_to_face(image_path=None, vertex_id_map=None, file_to_be_deleted=None):
+    if file_to_be_deleted is not None:
+        os.remove(file_to_be_deleted)
     face_locations = FR.face_locations(FR.load_image_file(image_path))
-    face_encodings = FR.face_encodings(FR.load_image_file(image_path))[0]
+    face_encodings = FR.face_encodings(FR.load_image_file(image_path))
     face_encoding_dict = open_encodings_dict()
 
-    if vertex_id_map is None:
-        if len(face_encodings) == 1:
-            for (k, v) in face_encoding_dict.items():
-                if FR.compare_faces([k], face_encodings)[0]:
-                    face_encoding_dict.update({k: vertex_id})
-                    break
-            face_encoding_dict.update({tuple(face_encodings): vertex_id})
-            save_encodings_dict(face_encoding_dict)
-        else:
-            val = draw_boxes(image_path)
-            return val
-    else:
-        for location, encoding in zip(face_locations, face_encodings):
-            if location in vertex_id_map.keys():
-                face_encoding_dict.update({tuple(encoding): vertex_id_map[location]})
-        save_encodings_dict(face_encoding_dict)
+    for location, encoding in zip(face_locations, face_encodings):
+        if location in vertex_id_map.keys():
+            face_encoding_dict.update({tuple(encoding): vertex_id_map[location]})
+    save_encodings_dict(face_encoding_dict)
 
 
 def recognize_encoding(encoding):
     dictionary = open_encodings_dict()
-    for (k, v) in dictionary.items():
-        face_encoding_list = [list(k) for (i, j) in dictionary.items() if j == v]
-        match = FR.compare_faces(face_encoding_list, numpy.asarray(encoding))
-        if True in match:
-            return v
+    distances = FR.face_distance([k for (k, v) in dictionary.items()], numpy.asarray(encoding))
+    if distances.size != 0:
+        if np.min(distances) < 0.6:
+            return list(dictionary.values())[np.argmin(distances)]
+
     return -1
 
 
@@ -112,12 +160,11 @@ def recognize_person(img_path, face_location=None):  ## Face Search
 
     def recognize_core(face_encoding):
         vertex_id = -1
-        if os.path.exists(os.path.abspath('Tree/people/faces/known/faces.json')):
+        if os.path.exists(current_app.config['FACES_JSON_PATH']):
             vertex_id = recognize_encoding(face_encoding)
-            face_encoding_dictionary.update({face_encoding: vertex_id})
-        else:
-            face_encoding_dictionary.update({face_encoding: -1})
-        save_encodings_dict(face_encoding_dictionary)
+            if vertex_id != -1:
+                face_encoding_dictionary.update({face_encoding: vertex_id})
+                save_encodings_dict(face_encoding_dictionary)
         return vertex_id
 
     if num_faces == 1 and face_location is None:
@@ -125,13 +172,18 @@ def recognize_person(img_path, face_location=None):  ## Face Search
         v_id = recognize_core(face_enc)
         return v_id
     elif face_location is None:
-        return FR.face_locations(img)
+        img2 = Image.fromarray(img.astype('uint8'))
+        rawBytes = io.BytesIO()
+        img2.save(rawBytes,"JPEG")
+        rawBytes.seek(0)
+        img_base64 = base64.b64encode(rawBytes.read())
+        return img_base64, FR.face_locations(img)
     else:
         locations = FR.face_locations(img)
-        encodings = FR.face_encodings(img)[0]
+        encodings = FR.face_encodings(img)
         for location, encoding in zip(locations, encodings):
-            if location == face_location:
-                v_id = recognize_core(encoding)
+            if location == tuple(face_location):
+                v_id = recognize_core(tuple(encoding))
                 return v_id
 
 
