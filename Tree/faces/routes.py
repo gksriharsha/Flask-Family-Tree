@@ -1,151 +1,164 @@
-import json
-import os
-import base64
-import uuid
+"""Photo endpoints.
 
-from flask import Blueprint, request, send_file, current_app
-from werkzeug.utils import secure_filename
+The header values that drove this pipeline were ``eval``-ed straight out of the WSGI environ.
+They are parsed as JSON now. Uploads are stored under a generated name rather than the
+client-supplied one, because the original joined ``secure_filename(...)`` onto a shared
+directory -- so two callers uploading ``photo.jpg`` overwrote each other, and the second caller's
+task id resolved to the first caller's image.
 
-from Tree.Utils.ImageReducer import reduce
-from Tree.faces.recognition import recognize_person, relate_person_to_face, draw_boxes
-from Tree import g
+Known remaining limitation, unchanged by this pass: the task table is a module-level dictionary,
+so the two-phase upload flow only works when both requests land on the same worker process. A
+shared store is the real fix and is out of scope here; the table is at least bounded now so it
+cannot grow without limit.
+"""
+
+import logging
+from collections import OrderedDict
+from pathlib import Path
+
+from flask import Blueprint, current_app
+
+from Tree.faces.recognition import UNKNOWN, draw_boxes, recognize_person, relate_person_to_face
 from Tree.model.Person import Person
 from Tree.people.people_Service import retrieve_person_service
 from Tree.relations.gremlin_Interface import get_all_relations
+from Tree.Utils.http import ApiError, as_vertex_id, as_vertex_ids, json_header, ok
+from Tree.Utils.ImageReducer import reduce
+
+log = logging.getLogger(__name__)
 
 faces = Blueprint('faces', __name__, url_prefix='/picture')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'tiff'}
-file_path_dictionary = {}
+
+MAX_TRACKED_TASKS = 256
+_tasks = OrderedDict()
 
 
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def _remember(token, path):
+    _tasks[token] = path
+    while len(_tasks) > MAX_TRACKED_TASKS:
+        _tasks.popitem(last=False)
+
+
+def _lookup(token):
+    path = _tasks.get(token)
+    if path is None:
+        raise ApiError('Unknown or expired Task-id.', status=404)
+    return path
+
+
+def _allowed(filename):
+    if not filename or '.' not in filename:
+        return False
+    extension = filename.rsplit('.', 1)[1].lower()
+    return extension in current_app.config['ALLOWED_IMAGE_EXTENSIONS']
+
+
+def _store_upload(field='image'):
+    """Save an upload under a generated name and return its path, or None if absent."""
+    from flask import request
+    if field not in request.files:
+        return None
+    upload = request.files[field]
+    if not upload or not _allowed(upload.filename):
+        raise ApiError('Filename or extension is invalid.', status=406)
+
+    extension = upload.filename.rsplit('.', 1)[1].lower()
+    import uuid
+    destination = Path(current_app.config['UPLOAD_IMAGE_PATH']) / f'{uuid.uuid4()}.{extension}'
+    upload.save(destination)
+    reduce(destination, fixed_height=current_app.config['RESIZED_IMAGE_HEIGHT'])
+    return destination
+
+
+def _person_response(vertex_id):
+    relations, person_dictionary = retrieve_person_service(vertex_id)
+    return ok('Person found',
+              Data=Person.createPersonObject(person_dictionary).to_dict(),
+              Relations=relations)
 
 
 @faces.route('/search', methods=['POST'])
 def picture_search():
-    filepath = current_app.config['UPLOAD_IMAGE_PATH']
+    path = _store_upload()
 
-    def send_response(response):
-        if response == -1:
-            return json.dumps({'Message': 'Selected person is not recognized'}), 404, {
-                'ContentType': 'application/json'}
-        if response > 0:
-            relations, person_dictionary = retrieve_person_service(response)
-            return json.dumps({'Message': 'Person found',
-                               'Data': json.loads(
-                                   json.dumps(Person.createPersonObject(person_dictionary),
-                                              default=lambda o: o.__dict__)),
-                               'Relations': relations}), 200, \
-                   {'ContentType': 'application/json'}
-
-    if 'image' not in request.files:
-        if 'HTTP_TASK_ID' in request.headers.environ and 'HTTP_FACE_LOCATION' in request.headers.environ:
-            response = recognize_person(file_path_dictionary[request.headers.environ['HTTP_TASK_ID']],
-                                        face_location=eval(request.headers.environ['HTTP_FACE_LOCATION']))
-            return send_response(response)
-        else:
-            return json.dumps({'Message': 'Picture not received/found'}), 404, {
-                'ContentType': 'application/json'}
+    if path is None:
+        # Second phase: the caller picked one face out of a multi-face photo.
+        token = json_header('Task-id', required=False)
+        location = json_header('face-location', required=False)
+        if token is None or location is None:
+            raise ApiError('Provide an image, or both Task-id and face-location.', status=404)
+        path = _lookup(str(token))
+        response = recognize_person(path, face_location=location)
     else:
-        search_image = request.files['image']
-        if search_image and allowed_file(search_image.filename) and search_image.filename != '':
-            filename = secure_filename(search_image.filename)
-            full_filepath = os.path.join(filepath, filename)
-            search_image.save(full_filepath)
-            reduce(full_filepath)
-        else:
-            return json.dumps({'Message': 'Filename/Extension is invalid.'}), 406, {
-                'ContentType': 'application/json'}
+        response = recognize_person(str(path))
 
-    response = recognize_person(img_path=full_filepath)
-    if isinstance(response, tuple) and isinstance(response[1], list):
-        random_value = str(uuid.uuid4())
-        file_path_dictionary.update({random_value: full_filepath})
-        return json.dumps({'Message': 'Multiple people detected', 'Image': str(response[0]),
-                           'Face-locations': response[1], 'Task-id': random_value}), 200, {
-                   'ContentType': 'application/json'
-               }
+    if isinstance(response, tuple):
+        encoded, locations = response
+        token = str(__import__('uuid').uuid4())
+        _remember(token, str(path))
+        return ok('Multiple people detected', Image=encoded,
+                  **{'Face-locations': locations, 'Task-id': token})
 
-    return send_response(response)
+    if response == UNKNOWN:
+        return ok('Selected person is not recognized', status=404)
+    return _person_response(response)
 
 
 @faces.route('/recognize', methods=['POST'])
 def recognize():
-    filepath = current_app.config['UPLOAD_IMAGE_PATH']
-    if 'image' in request.files:
+    path = _store_upload()
 
-        source_image = request.files['image']
+    if path is not None:
+        token, _filename, encoded, locations = draw_boxes(
+            str(path), encoded_Image=True, numbering=True,
+        )
+        _remember(token, str(path))
+        return ok('Multiple people detected', Image=encoded,
+                  **{'Face-locations': locations, 'Task-id': token})
 
-        if source_image and allowed_file(source_image.filename):
-            filename = secure_filename(source_image.filename)
-            full_filepath = os.path.join(filepath, filename)
-            source_image.save(full_filepath)
-            reduce(full_filepath)
-            value, file, image, face_locations = draw_boxes(full_filepath,encoded_Image=True,numbering=True)
-            file_path_dictionary.update({str(value): full_filepath})
-            return json.dumps({'Message': 'Multiple people detected', 'Image': str(image),
-                               'Face-locations': face_locations, 'Task-id': str(value)}), 200, {
-                       'ContentType': 'application/json'
-                   }
+    token = str(json_header('Task-id'))
+    path = _lookup(token)
+    vertex_map = _parse_vertex_map(json_header('Vertex-id-map'))
+    recorded = relate_person_to_face(image_path=path, vertex_id_map=vertex_map)
+    return ok('Mapped the picture to faces', Result=recorded)
 
-        else:
-            return json.dumps({'Message': 'Filename is invalid.'}), 406, {
-                'ContentType': 'application/json'}
-    else:
-        try:
-            filename = file_path_dictionary[request.headers.environ['HTTP_TASK_ID']]
-            v_map = eval(request.headers.environ['HTTP_VERTEX_ID_MAP'])
-            vertex_map = {}
-            for i,item in enumerate(v_map):
-                try:
-                    if i%5 == 0:
-                        vertex_map.update({(v_map[i],v_map[i+1],v_map[i+2],v_map[i+3]):v_map[i+4]})
-                except:
-                    break
-            relate_person_to_face(image_path=filename, vertex_id_map=vertex_map,
-                                  file_to_be_deleted=current_app.config['UPLOAD_IMAGE_PATH']+'/'+str(request.headers.environ['HTTP_TASK_ID'])+'.jpg')
-            return json.dumps({'Message': 'Mapped the picture to faces'}), 200, {
-                'ContentType': 'application/json'}
-        except Exception as e:
-            print(e)
-            return json.dumps({'Message': 'Picture not received/found'}), 404, {
-                'ContentType': 'application/json'}
+
+def _parse_vertex_map(payload):
+    """Accept ``[{"box": [t,r,b,l], "vertex_id": n}, ...]`` or the legacy flat list of fives."""
+    if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+        return {
+            tuple(int(v) for v in entry['box']): as_vertex_id(entry['vertex_id'])
+            for entry in payload
+        }
+    if isinstance(payload, list):
+        if len(payload) % 5 != 0:
+            raise ApiError('Vertex-id-map must contain groups of five values.')
+        mapping = {}
+        for index in range(0, len(payload), 5):
+            box = tuple(int(v) for v in payload[index:index + 4])
+            mapping[box] = as_vertex_id(payload[index + 4])
+        return mapping
+    raise ApiError('Vertex-id-map must be a JSON array.')
 
 
 @faces.route('/relate', methods=['POST'])
 def relate():
-    filepath = current_app.config['UPLOAD_IMAGE_PATH']
+    path = _store_upload()
 
-    if 'image' in request.files:
-        source_image = request.files['image']
+    if path is not None:
+        token, _filename, encoded, locations = draw_boxes(str(path), encoded_Image=True)
+        _remember(token, str(path))
+        return ok('Select the faces to relate to this person', Image=encoded,
+                  **{'Face-locations': locations, 'Task-id': token})
 
-        if source_image and allowed_file(source_image.filename):
-            filename = secure_filename(source_image.filename)
-            full_filepath = os.path.join(filepath, filename)
-            source_image.save(full_filepath)
-            reduce(full_filepath)
-            value, file, image, known_face_locations = draw_boxes(full_filepath,encoded_Image=True)
-            file_path_dictionary.update({str(value):full_filepath})
-            return json.dumps({'Message': 'Select the faces to relate to this person', 'Image': str(image),
-                               'Face-locations': known_face_locations, 'Task-id': str(value)}), 200, {
-                       'ContentType': 'application/json'
-                   }
-        else:
-            return json.dumps({'Message': 'Filename is invalid.'}), 406, {
-                'ContentType': 'application/json'}
-
-    else:
-        try:
-            filename = file_path_dictionary[request.headers.environ['HTTP_TASK_ID']]
-            relatives = get_all_relations(start_id=eval(request.headers.environ['HTTP_START_ID']),
-                                          end_ids=eval(request.headers.environ['HTTP_END_IDS']))
-            _, _, image, _ = draw_boxes(img_path=filename, relatives_dictionary=relatives,encoded_Image=True)
-            return json.dumps({'Message': 'All selections related', 'Image': str(image)}), 200, {
-                       'ContentType': 'application/json'
-                   }
-        except Exception as e:
-            print(e)
-            return json.dumps({'Message': 'Image not found.'}), 404, {
-                'ContentType': 'application/json'}
+    token = str(json_header('Task-id'))
+    path = _lookup(token)
+    start_id = as_vertex_id(json_header('start_id'), field='start_id')
+    end_ids = as_vertex_ids(
+        json_header('end_ids'), current_app.config['MAX_RELATION_TARGETS'], field='end_ids',
+    )
+    relatives = get_all_relations(start_id=start_id, end_ids=end_ids)
+    _token, _filename, encoded, _locations = draw_boxes(
+        img_path=path, relatives_dictionary=relatives, encoded_Image=True,
+    )
+    return ok('All selections related', Image=encoded)

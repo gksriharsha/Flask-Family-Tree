@@ -1,7 +1,62 @@
 /* groovylint-disable CompileStatic, ExplicitCallToMinusMethod, SimpleDateFormatMissingLocale, VariableTypeRequired */
 /* groovylint-disable-next-line LineLength */
 /* groovylint-disable DuplicateStringLiteral, MethodParameterTypeRequired,MethodReturnTypeRequired, NestedForLoop, NoDef */
+
+/* ============================================================================
+ * Server-side helper functions.
+ *
+ * WHAT WAS FIXED IN THIS PASS: every local is now declared with `def`. Groovy treats an
+ * assignment to an undeclared name as a write to the script Binding, and Gremlin Server keeps
+ * ONE script engine for all sessionless requests -- so these were entries in a single
+ * process-wide map shared by every concurrent request on every gremlinPool thread. Two
+ * simultaneous calls could read each other's `gender1`, `path` or `siblings`, which is a silent
+ * graph-corruption path under any concurrent use.
+ *
+ * WHAT IS STILL KNOWN-BROKEN, deliberately left for the next pass so this diff stays reviewable:
+ *
+ *   1. `T.ID` does not exist in TinkerPop -- the token is `T.id`, and for an element id the step
+ *      is `.id()` rather than `values(...)`. It appears 16 times below. Note that the ordinary
+ *      path through relation() does NOT touch any of them and works (verified against a live
+ *      graph: it returns a correct 'Cousin_Of'); the T.ID sites sit in the adoption and
+ *      consanguinity branches.
+ *   1b. marriage() fails before reaching any T.ID site, with "the traversal can no longer be
+ *      modulated": it calls cousinMarraige.hasNext(), which executes the traversal, and then
+ *      appends .path() to the already-executed traversal. The fix is the .clone() idiom this
+ *      file already uses elsewhere. Verified live: POST /relate/people with Relation=Marriage
+ *      returns 500.
+ *   2. adoption() reads `lastname` one line before it is assigned -- a deterministic throw on
+ *      every call, which also makes siblings() unreachable.
+ *   3. child() never calls siblings(), so biological siblings get no sibling edges. (The
+ *      duplicate-parent1 half of this defect IS fixed: the child's upward edge now goes to
+ *      each parent once.)
+ *   4. child() names its own parameter `adoption`, shadowing the function it tries to call, so
+ *      the same-sex-parents branch resolves to Boolean.call().
+ *   5. siblings() calls `g(parent2)` without `.V()`, calls siblings_relation with 2 arguments
+ *      against a 3-parameter definition, and misspells 'Mother_of'.
+ *   6. divorce() writes self-loops (`.to(V(person1))` from person1) and is unreferenced.
+ *   7. No repeat() traversal has a times()/limit() cutoff.
+ *
+ * DEPLOYMENT NOTE: these definitions should be loaded by Gremlin Server itself through
+ * ScriptFileGremlinPlugin (see docker-compose.yml), not submitted by the application at
+ * startup. Submitting them through a sessionless client only works as a side effect of the
+ * engine's global-closure cache: the definitions are lost on every Gremlin Server restart and
+ * exist on only one node behind a load balancer.
+ * ========================================================================= */
 def relation(g, from, to) {
+    // Locals declared so assignment targets the method frame. Without `def` these
+    // are entries in one process-wide Binding shared by every concurrent request.
+    def adoptedCheck = null
+    def adoptedID = null
+    def count = null
+    def multiplePath = null
+    def multipleRelation = null
+    def parentID = null
+    def path = null
+    def people = null
+    def relationshipID = null
+    def secondPath = null
+    def significantOther = null
+    def temp = null
 
     adoptedCheck  = g.V().has(id, from).repeat(out().dedup()).until(has(id, to)).path()\
     .unfold().where(has('Adopted', 'Yes'))
@@ -80,11 +135,18 @@ def relation(g, from, to) {
     return path
 }
 def shortestPath(g,from,to){
+    // Locals declared so assignment targets the method frame. Without `def` these
+    // are entries in one process-wide Binding shared by every concurrent request.
+    def path = null
     path = g.V().has(id, from).repeat(inE().otherV().dedup()).until(has(id, to)).path()\
         .by('Firstname').by(label).next()
     return path 
 }
 def adoption(g, parent1, parent2, child, Map kwargs =[:]) {
+    // Locals declared so assignment targets the method frame. Without `def` these
+    // are entries in one process-wide Binding shared by every concurrent request.
+    def gender = null
+    def lastname = null
     gender = g.V(child).values('Gender').next()
     g.V(child).property('Adopted', 'Yes').next()
 
@@ -125,6 +187,10 @@ def adoption(g, parent1, parent2, child, Map kwargs =[:]) {
     siblings(g,parent1,parent2,child)
 }
 def siblings_relation(g,sibling,siblings) {
+    // Locals declared so assignment targets the method frame. Without `def` these
+    // are entries in one process-wide Binding shared by every concurrent request.
+    def addition = null
+    def gender = null
     addition = ''
     if (g.V(sibling).values('Adopted').next() == 'Yes') {
         addition = '*'
@@ -146,6 +212,11 @@ def siblings_relation(g,sibling,siblings) {
     }
 }
 def siblings(g, parent1, parent2,child) {
+    // Locals declared so assignment targets the method frame. Without `def` these
+    // are entries in one process-wide Binding shared by every concurrent request.
+    def siblings = null
+    def siblings1 = null
+    def siblings2 = null
 
     // parent1 is usually the father and parent 2 is usually the mother.
     
@@ -182,6 +253,16 @@ def siblings(g, parent1, parent2,child) {
     }
 }
 def marriage(g, person1, person2) {
+    // Locals declared so assignment targets the method frame. Without `def` these
+    // are entries in one process-wide Binding shared by every concurrent request.
+    def cousinMarraige = null
+    def gender1 = null
+    def gender2 = null
+    def i = null
+    def marriageID = null
+    def path = null
+    def person3 = null
+    def person4 = null
     gender1 = g.V(person1).values('Gender').next()
     gender2 = g.V(person2).values('Gender').next()
 
@@ -243,6 +324,10 @@ def divorce(g,person1,person2){
 }
 
 def ageDifference(g, person1, person2) {
+    // Locals declared so assignment targets the method frame. Without `def` these
+    // are entries in one process-wide Binding shared by every concurrent request.
+    def DOB1 = null
+    def DOB2 = null
     DOB1 = g.V(person1).values('Date_of_birth').next()
     DOB2 = g.V(person2).values('Date_of_birth').next()
     def sdf = new java.text.SimpleDateFormat('yyyy-MM-dd')
@@ -266,7 +351,10 @@ def child(g, parent1, parent2, child, adoption=false) {
                 if (ageDifference(g, parent1, child) > 13 && \
                      ageDifference(g, parent2, child) > 13) {
                     g.V(child).addE('Son_Of').to(V(parent1)).next()
-                    g.V(child).addE('Son_Of').to(V(parent1)).next()
+                    // Was `.to(V(parent1))` twice, so the mother never received the child's
+                    // upward edge and the father received two. Confirmed against a live graph:
+                    // father in=[Son_Of, Son_Of], mother in=[].
+                    g.V(child).addE('Son_Of').to(V(parent2)).next()
                      }
             }
         }
@@ -282,7 +370,8 @@ def child(g, parent1, parent2, child, adoption=false) {
                  //TODO: Add exceptions when illogical steps are found
 
                     g.V(child).addE('Daughter_Of').to(V(parent1)).next()
-                    g.V(child).addE('Daughter_Of').to(V(parent1)).next()
+                    // Same defect as the Son_Of branch above.
+                    g.V(child).addE('Daughter_Of').to(V(parent2)).next()
                 }
             }
         }
