@@ -1,0 +1,65 @@
+# Local development stack: two containers.
+#
+# JanusGraph runs on the BerkeleyJE + Lucene profile -- one JVM, roughly 1 GB -- rather than
+# Cassandra plus Elasticsearch, which is three JVMs and around 8 GB. Lucene supports the mixed
+# index that the substring name search needs, so nothing in this application loses capability.
+# Move to the cql-es profile only when a single node genuinely stops being enough.
+
+services:
+  janusgraph:
+    image: janusgraph/janusgraph:1.0.0
+    environment:
+      JANUS_PROPS_TEMPLATE: berkeleyje-lucene
+      janusgraph.storage.directory: /var/lib/janusgraph/data
+      janusgraph.index.search.directory: /var/lib/janusgraph/index
+      # The JVM heap is bounded explicitly. Left to its own devices the server sizes the heap
+      # from the host's memory and gets OOM-killed on a laptop-sized Docker VM.
+      JAVA_OPTIONS: "-Xms512m -Xmx1g"
+    mem_limit: 2g
+    volumes:
+      - janusgraph-data:/var/lib/janusgraph
+      # Mounted so the server can load the helpers itself. To make the definitions survive a
+      # restart, add this to the server's gremlin-server.yaml and set
+      # INJECT_GROOVY_AT_STARTUP=false on the api service:
+      #
+      #   scriptEngines:
+      #     gremlin-groovy:
+      #       plugins:
+      #         org.apache.tinkerpop.gremlin.jsr223.ScriptFileGremlinPlugin:
+      #           files: [/opt/janusgraph/scripts/familytree.groovy]
+      #
+      # Startup injection is the default here only because it needs no server configuration.
+      - ./functions.groovy:/opt/janusgraph/scripts/familytree.groovy:ro
+      - ./schema.groovy:/opt/janusgraph/scripts/schema.groovy:ro
+    healthcheck:
+      # A TCP probe through bash, not `bin/gremlin.sh`. The scripted probe starts a second JVM
+      # on every check, which is enough extra memory pressure to get the server OOM-killed.
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8182'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    ports:
+      - "127.0.0.1:8182:8182"
+
+  api:
+    build: .
+    depends_on:
+      janusgraph:
+        condition: service_healthy
+    environment:
+      GREMLIN_DATABASE_URI: ws://janusgraph:8182/gremlin
+      FAMILYTREE_API_TOKEN: ${FAMILYTREE_API_TOKEN:?set FAMILYTREE_API_TOKEN in .env}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INJECT_GROOVY_AT_STARTUP: ${INJECT_GROOVY_AT_STARTUP:-1}
+    volumes:
+      - api-data:/data
+    # Published on loopback only. Put a TLS-terminating reverse proxy in front before this is
+    # reachable from anywhere else.
+    ports:
+      - "127.0.0.1:5000:5000"
+
+volumes:
+  janusgraph-data:
+  api-data:

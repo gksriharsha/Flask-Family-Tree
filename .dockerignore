@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+venv*
+data
+tests
+design
+__pycache__
+*.pyc
+*.md
+!README.md
+
+# Installed and generated: the image builds the interface itself.
+node_modules
+web/dist
