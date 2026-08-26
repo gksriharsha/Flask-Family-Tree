@@ -1,0 +1,485 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+Telugu:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --paper:#EFF1EA; --surface:#FAFBF7; --surface-2:#E7EBDE; --sunk:#E2E7D6;
+      --ink:#1A1E15; --ink-2:#3D4636; --muted:#6B7563; --rule:#D3D9C6; --rule-soft:#E3E7D8;
+      --olive:#3F6D14; --olive-soft:#E4EDD4; --olive-line:#7FA352;
+      --brown:#8F3F0A; --brown-soft:#F4E3D5;
+      --blue:#1261BB; --blue-soft:#DCE8F7;
+      --amber:#A45C0E; --amber-soft:#F9E8D4;
+      --serif:"Faustina","Iowan Old Style",Georgia,serif;
+      --sans:"Source Sans 3","Helvetica Neue",Arial,sans-serif;
+      --telugu:"Noto Serif Telugu","Faustina",serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+           font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { color:#0E4E96; text-decoration:underline; }
+    button { font-family:inherit; font-size:inherit; color:inherit; cursor:pointer; }
+    .lbl { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+           color:var(--muted); margin:0 0 9px; }
+    .te { font-family:var(--telugu); }
+    .tnum { font-variant-numeric:tabular-nums; }
+  </style>
+  <style>
+    .wrap { max-width:1180px; margin:0 auto; padding:26px 32px 48px; }
+    .crumb { font-size:12px; color:var(--muted); margin-bottom:16px; }
+
+    .head { display:flex; align-items:flex-start; gap:22px; padding-bottom:20px;
+            border-bottom:1px solid var(--rule); }
+    .portrait { width:84px; height:84px; flex:none; border-radius:3px;
+                background:var(--surface-2); border:1px solid var(--rule);
+                display:grid; place-items:center; }
+    .h-name { font-family:var(--serif); font-size:30px; font-weight:600; line-height:1.08;
+              letter-spacing:-.018em; }
+    .h-te { font-family:var(--telugu); font-size:19px; color:var(--ink-2); margin-top:2px; }
+    .h-meta { font-size:13px; color:var(--muted); margin-top:8px; font-variant-numeric:tabular-nums; }
+    /* Chips are a sized primitive. Height is declared here rather than left to flex
+       stretch, so a chip is the same size in any container, and a long label wraps the whole
+       chip to the next line instead of breaking inside it. */
+    .pills { display:flex; align-items:center; gap:6px; margin-top:10px; flex-wrap:wrap; }
+    .pill { display:inline-flex; align-items:center; height:22px; padding:0 8px;
+            font-size:10.5px; font-weight:700; line-height:1; letter-spacing:.06em;
+            text-transform:uppercase; white-space:nowrap; border-radius:3px;
+            border:1px solid transparent; }
+    .pill.living { color:var(--olive); background:var(--olive-soft); border-color:var(--olive-line); }
+    .pill.adopt { color:var(--brown); background:var(--brown-soft); border-color:var(--brown); }
+    .pill.priv { color:var(--blue); background:var(--blue-soft); border-color:var(--blue); }
+    .pill.flag { color:#5E360A; background:var(--amber-soft); border-color:var(--amber); }
+    .pill.sample { color:var(--muted); background:var(--sunk); border-color:var(--rule); }
+    .pill.is-rel { color:var(--olive); background:var(--olive-soft); border-color:var(--olive-line); }
+    .h-acts { margin-left:auto; display:flex; gap:8px; }
+    .btn { height:34px; padding:0 14px; border-radius:3px; border:1px solid var(--blue);
+           background:var(--blue); color:#fff; font-size:12.5px; font-weight:600;
+           display:inline-grid; place-items:center; }
+    .btn:hover { background:#0E4E96; }
+    .btn.ghost { background:var(--surface); color:var(--blue); }
+    .btn.ghost:hover { background:var(--blue-soft); }
+
+    /* Multiplicity is content, so it is drawn in the record's own accent rather than in the
+       colour reserved for things that are wrong. */
+    .ways { margin-top:18px; border:1px solid var(--olive-line); border-left-width:3px;
+            border-radius:0 4px 4px 0; background:var(--surface); overflow:hidden; }
+    .ways-head { display:flex; align-items:center; gap:8px; padding:9px 15px;
+                 background:var(--olive-soft); border-bottom:1px solid var(--olive-line);
+                 font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+                 color:var(--olive); }
+    .ways-rows { display:grid; grid-template-columns:1fr 1fr; }
+    .way { padding:12px 15px; }
+    .way + .way { border-left:1px dashed var(--rule); }
+    .way .wl { display:block; font-size:10px; font-weight:700; letter-spacing:.08em;
+               text-transform:uppercase; color:var(--muted); }
+    .way .wv { display:block; font-family:var(--serif); font-size:17px; font-weight:600;
+               line-height:1.2; margin-top:3px; }
+    .way .wt { display:block; font-family:var(--telugu); font-size:15px; color:var(--olive);
+               margin-top:1px; }
+    .way .wt.is-open { display:inline-block; color:var(--blue); border:1px dashed var(--blue);
+                       border-radius:3px; padding:1px 6px; font-size:14px; }
+    .way .wn { display:block; font-size:12px; color:var(--ink-2); line-height:1.5; margin-top:6px; }
+    .ways-foot { margin:0; padding:10px 15px; border-top:1px solid var(--rule-soft);
+                 background:var(--sunk); font-size:12.5px; color:var(--ink-2); line-height:1.55; }
+    .calm { font-size:12.5px; color:var(--ink-2); line-height:1.55; margin:-2px 0 12px;
+            max-width:62ch; }
+    .tabs { display:flex; gap:2px; margin:24px 0 0; border-bottom:1px solid var(--rule); }
+    .tabs button { border:none; background:none; padding:9px 15px 10px; font-size:13px;
+                   font-weight:600; color:var(--muted); border-bottom:2px solid transparent;
+                   margin-bottom:-1px; }
+    .tabs button:hover { color:var(--ink-2); }
+    .tabs button.on { color:var(--olive); border-bottom-color:var(--olive); }
+    .tabs .n { font-size:10.5px; color:var(--muted); font-weight:600; margin-left:5px;
+               background:var(--sunk); border-radius:8px; padding:0 5px; }
+
+    .panel { padding-top:24px; }
+    .cols { display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:start; }
+    .cols3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; align-items:start; }
+
+    .card { background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+            padding:15px 16px 16px; }
+    .card + .card { margin-top:16px; }
+    .card h3 { margin:0 0 12px; font-family:var(--serif); font-size:15px; font-weight:600; }
+
+    .row { display:grid; grid-template-columns:112px 1fr; gap:12px; padding:6px 0;
+           align-items:baseline; font-size:13px; }
+    .row + .row { border-top:1px solid var(--rule-soft); }
+    .row .k { font-size:11px; color:var(--muted); }
+    .row .v { color:var(--ink-2); }
+    .approx { color:var(--muted); font-style:italic; }
+    .range { display:inline-block; font-size:10.5px; color:var(--muted); background:var(--sunk);
+             border-radius:2px; padding:1px 5px; margin-left:6px; font-variant-numeric:tabular-nums;
+             font-style:normal; }
+
+    .nmrow { display:flex; align-items:baseline; gap:10px; padding:8px 0; }
+    .nmrow + .nmrow { border-top:1px solid var(--rule-soft); }
+    .nmrow .ntype { font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+                    color:var(--muted); min-width:66px; }
+    .nmrow .nval { font-family:var(--serif); font-size:15px; font-weight:600; }
+    .nmrow .nval.tel { font-family:var(--telugu); font-weight:500; }
+    .nmrow .pref { font-size:10px; color:var(--olive); font-weight:700; letter-spacing:.06em; }
+
+    .pset { border:1px solid var(--rule); border-radius:4px; overflow:hidden; }
+    .pset + .pset { margin-top:14px; }
+    .pset > .ph { display:flex; align-items:center; gap:8px; padding:8px 12px;
+                  font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; }
+    .pset.bio > .ph { background:var(--olive-soft); color:var(--olive);
+                      border-bottom:1px solid var(--olive-line); }
+    .pset.adv > .ph { background:var(--brown-soft); color:var(--brown);
+                      border-bottom:1px dashed var(--brown); }
+    .prow { display:flex; align-items:baseline; gap:10px; padding:9px 12px; }
+    .prow + .prow { border-top:1px solid var(--rule-soft); }
+    .prow .role { font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+                  color:var(--muted); min-width:52px; }
+    .prow .who { display:block; font-family:var(--serif); font-size:14px; font-weight:600; }
+    .prow .whote { display:block; font-family:var(--telugu); font-size:12px; color:var(--muted); }
+    .cert { margin-left:auto; font-size:10px; font-weight:700; letter-spacing:.05em;
+            text-transform:uppercase; color:var(--muted); }
+
+    .tl { position:relative; padding-left:22px; }
+    .tl::before { content:""; position:absolute; left:5px; top:6px; bottom:6px;
+                  border-left:2px solid var(--rule); }
+    .ev { position:relative; padding:9px 0; }
+    .ev::before { content:""; position:absolute; left:-21px; top:15px; width:9px; height:9px;
+                  border-radius:50%; background:var(--surface); border:2px solid var(--olive-line); }
+    .ev.est::before { border-style:dashed; border-color:var(--muted); }
+    .ev .when { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .ev .what { font-family:var(--serif); font-size:14.5px; font-weight:600; margin-top:1px; }
+    .ev .where { font-size:12.5px; color:var(--ink-2); }
+    .ev .src { font-size:11px; color:var(--muted); margin-top:3px; }
+    .ev .src.none { color:var(--amber); }
+
+    .empty { border:1px dashed var(--rule); border-radius:4px; padding:26px 22px;
+             text-align:center; background:var(--surface); }
+    .empty h4 { margin:0 0 6px; font-family:var(--serif); font-size:16px; font-weight:600; }
+    .empty p { margin:0 auto 14px; font-size:13px; color:var(--ink-2); max-width:52ch;
+               line-height:1.55; }
+
+    .photos { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
+    .ph-t { aspect-ratio:4/3; border-radius:3px; background:var(--surface-2);
+            border:1px solid var(--rule); display:grid; place-items:center; position:relative; }
+    .ph-t span { position:absolute; bottom:6px; left:7px; font-size:10.5px; color:var(--muted); }
+    .consent { margin-top:14px; font-size:12px; color:var(--ink-2); background:var(--sunk);
+               border-radius:3px; padding:10px 12px; line-height:1.55; }
+  </style>
+</helmet>
+
+<div class="wrap">
+  <div class="crumb">People &rsaquo; Sharma &rsaquo; <strong>Harinath</strong></div>
+
+  <div class="head">
+    <div class="portrait">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="9" r="3.6" stroke="#6B7563" stroke-width="1.5"/>
+        <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="#6B7563" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="h-name">Harinath Sharma</div>
+      <div class="h-te">హరినాథ్ శర్మ</div>
+      <div class="h-meta">birth year not recorded &middot; Vijayawada</div>
+      <div class="pills">
+        <span class="pill living">Living</span>
+        <span class="pill is-rel">Related to you two ways</span>
+        <span class="pill adopt">Adoptive link</span>
+        <span class="pill priv">Visible to family</span>
+        <span class="pill sample">Sample record</span>
+      </div>
+    </div>
+    <div class="h-acts">
+      <button class="btn ghost">Show in tree</button>
+      <button class="btn">Edit record</button>
+    </div>
+  </div>
+
+  <div class="ways">
+    <div class="ways-head">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none">
+        <path d="M12 21V9" stroke="#3F6D14" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M12 9C12 5.5 9.2 3 5.6 3c0 3.5 2.8 6 6.4 6Z" stroke="#3F6D14" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M12 12c0-3.2 2.6-5.4 5.6-5.4 0 3.2-2.2 5.4-5.6 5.4Z" stroke="#7FA352" stroke-width="1.7" stroke-linejoin="round"/>
+      </svg>
+      Related to you two ways
+    </div>
+    <div class="ways-rows">
+      <div class="way">
+        <span class="wl">By birth</span>
+        <span class="wv">Father&rsquo;s brother</span>
+        <span class="wt is-open">పెద్దనాన్న / చిన్నాన్న</span>
+        <span class="wn">Born to Eshwar Datta and Girija, your father&rsquo;s parents.
+          Telugu picks between those two words by birth order, and none is recorded &mdash; so
+          the record shows both until someone settles it.</span>
+      </div>
+      <div class="way">
+        <span class="wl">Through the adoption</span>
+        <span class="wv">Granduncle</span>
+        <span class="wt">తాత</span>
+        <span class="wn">Adopted by Girija&rsquo;s own parents, which makes him her adoptive
+          brother as well as her son.</span>
+      </div>
+    </div>
+    <p class="ways-foot">Both are recorded, both are real, and both are used when working out how
+      anyone in the tree is related to anyone else. Several people here are connected more than
+      one way &mdash; through an adoption, or through a marriage inside the family.</p>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="{{t.o}}" onClick="{{go.overview}}">Overview</button>
+    <button class="{{t.r}}" onClick="{{go.relations}}">Relations<span class="n">7</span></button>
+    <button class="{{t.t}}" onClick="{{go.timeline}}">Timeline<span class="n">4</span></button>
+    <button class="{{t.s}}" onClick="{{go.sources}}">Sources<span class="n">0</span></button>
+    <button class="{{t.p}}" onClick="{{go.photos}}">Photos<span class="n">3</span></button>
+  </div>
+
+  <!-- ── Overview ── -->
+  <sc-if value="{{is.overview}}" hint-placeholder-val="{{true}}">
+  <div class="panel">
+    <div class="cols">
+      <div>
+        <div class="card">
+          <h3>Names</h3>
+          <div class="nmrow"><span class="ntype">Birth</span>
+            <span class="nval">Harinath Varma</span></div>
+          <div class="nmrow"><span class="ntype">Adoptive</span>
+            <span class="nval">Harinath Sharma</span>
+            <span class="pref">Preferred</span></div>
+          <div class="nmrow"><span class="ntype">Telugu</span>
+            <span class="nval tel">హరినాథ్ శర్మ</span></div>
+          <div class="nmrow"><span class="ntype">Called</span>
+            <span class="nval">Sitaram</span></div>
+        </div>
+
+        <div class="card">
+          <h3>Identity</h3>
+          <div class="row"><span class="k">Sex</span><span class="v">Male</span></div>
+          <div class="row"><span class="k">Gender</span><span class="v approx">not recorded</span></div>
+          <div class="row"><span class="k">Living</span><span class="v">Yes</span></div>
+          <div class="row"><span class="k">Visibility</span><span class="v">Family members</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h3>Vital facts</h3>
+          <div class="row"><span class="k">Born</span>
+            <span class="v approx">not recorded</span></div>
+          <div class="row"><span class="k">Birthplace</span>
+            <span class="v">Vijayawada, Andhra Pradesh, India</span></div>
+          <div class="row"><span class="k">Died</span><span class="v approx">&mdash;</span></div>
+          <div class="row"><span class="k">Occupation</span>
+            <span class="v">Schoolteacher <span class="range">years not recorded</span></span></div>
+          <div class="row"><span class="k">Native to</span><span class="v">Sharma village</span></div>
+        </div>
+
+        <div class="card">
+          <h3>What the missing birth date blocks</h3>
+          <div class="row" style="grid-template-columns:1fr">
+            <span class="v" style="line-height:1.6">No birth record has been found, and none has
+            been estimated &mdash; an invented date would be worse than the gap. English can still
+            name every relationship he has. Telugu cannot name three of them, because
+            <em>Peddananna</em> and <em>Chinnanna</em>, <em>Annayya</em> and <em>Thammudu</em>
+            differ only by who was born first. One answer from a family member settles all three
+            at once, which is what the prompt on the tree asks for.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ── Relations ── -->
+  <sc-if value="{{is.relations}}" hint-placeholder-val="{{false}}">
+  <div class="panel">
+    <div class="cols">
+      <div>
+        <p class="lbl">Parents &mdash; two sets, each with its own role</p>
+        <div class="calm">Two parent sets is an ordinary shape here, not an error. The role sits on
+          each link, so a reader can see which household he was born into and which he was raised
+          in &mdash; and the kinship engine can name both relationships instead of picking one.</div>
+        <div class="pset bio">
+          <div class="ph">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 21V8M12 8C12 4.5 9 2 5.5 2c0 3.5 3 6 6.5 6Z" stroke="#3F6D14" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            Biological
+          </div>
+          <div class="prow"><span class="role">Father</span>
+            <span><span class="who">Eshwar Datta Varma</span>
+            <span class="whote">ఈశ్వర్ దత్త వర్మ</span></span>
+            <span class="cert">Proven</span></div>
+          <div class="prow"><span class="role">Mother</span>
+            <span><span class="who">Girija Sharma</span>
+            <span class="whote">గిరిజ శర్మ</span></span>
+            <span class="cert">Proven</span></div>
+        </div>
+        <div class="pset adv">
+          <div class="ph">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12h16M12 4v16" stroke="#8F3F0A" stroke-width="1.8" stroke-dasharray="3 2.5" stroke-linecap="round"/></svg>
+            Adoptive
+          </div>
+          <div class="prow"><span class="role">Father</span>
+            <span><span class="who">Parent1 Varma</span>
+            <span class="whote approx">given name not recorded</span></span>
+            <span class="cert">Probable</span></div>
+          <div class="prow"><span class="role">Mother</span>
+            <span><span class="who">Parent2 Varma</span>
+            <span class="whote approx">given name not recorded</span></span>
+            <span class="cert">Probable</span></div>
+        </div>
+      </div>
+
+      <div>
+        <p class="lbl">Union</p>
+        <div class="card" style="padding:0">
+          <div class="prow"><span class="role">Wife</span>
+            <span><span class="who">Kalyani Naidu</span>
+            <span class="whote">కళ్యాణి నాయుడు</span></span>
+            <span class="cert">Date not recorded</span></div>
+        </div>
+        <p class="lbl" style="margin-top:20px">Children</p>
+        <div class="card" style="padding:0">
+          <div class="prow"><span class="role">Son</span>
+            <span><span class="who">Lokesh Sharma</span>
+            <span class="whote">లోకేష్ శర్మ</span></span>
+            <span class="cert">Year not recorded</span></div>
+          <div class="prow"><span class="role">Son</span>
+            <span><span class="who">Manoj Sharma</span>
+            <span class="whote">మనోజ్ శర్మ</span></span>
+            <span class="cert">Year not recorded</span></div>
+        </div>
+        <p class="lbl" style="margin-top:20px">Siblings are derived, not stored</p>
+        <div class="card" style="font-size:13px;color:var(--ink-2);line-height:1.6">
+          Four full siblings through Eshwar Datta and Girija, and one adoptive sibling
+          &mdash; Girija herself, who is also his mother. Sibling links are computed from
+          shared parents each time they are shown, so they cannot drift out of step with the
+          parent links the way stored sibling edges do, and a person who appears in two roles
+          appears correctly in both.
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ── Timeline ── -->
+  <sc-if value="{{is.timeline}}" hint-placeholder-val="{{false}}">
+  <div class="panel">
+    <div class="cols">
+      <div class="tl">
+        <div class="ev est">
+          <div class="when">year not recorded</div>
+          <div class="what">Born</div>
+          <div class="where">Vijayawada, Andhra Pradesh</div>
+          <div class="src none">No source cited</div>
+        </div>
+        <div class="ev est">
+          <div class="when">before 1962</div>
+          <div class="what">Adopted by Parent1 and Parent2 Varma</div>
+          <div class="where">Both adoptive parents are recorded as Varma, while he is
+            Sharma &mdash; the surname question is itself unsettled</div>
+          <div class="src none">No source cited &mdash; family recollection only</div>
+        </div>
+        <div class="ev est">
+          <div class="when">year not recorded</div>
+          <div class="what">Began teaching</div>
+          <div class="where">Government High School, Vijayawada</div>
+          <div class="src none">No source cited</div>
+        </div>
+        <div class="ev est">
+          <div class="when">date not recorded</div>
+          <div class="what">Married Kalyani Naidu</div>
+          <div class="where">Vijayawada</div>
+          <div class="src none">No source cited &mdash; the marriage register would settle it</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Reading the timeline</h3>
+          <div style="font-size:13px;color:var(--ink-2);line-height:1.65">
+            A dashed marker means the date is an estimate or a bound rather than a known day.
+            All four events here are dashed and none carries a source &mdash;
+            visible on the record rather than hidden, because a family tree whose confidence
+            is invisible is a family tree nobody can correct.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ── Sources ── -->
+  <sc-if value="{{is.sources}}" hint-placeholder-val="{{false}}">
+  <div class="panel">
+    <div class="empty">
+      <h4>Nothing on this record is cited yet</h4>
+      <p>Every fact above &mdash; the names, the two parent sets, the adoption, the marriage date
+         &mdash; currently rests on family recollection. A citation is what lets a relative
+         disagree with a date and settle it, and what makes an export worth anything to
+         another researcher.</p>
+      <button class="btn">Add the first source</button>
+    </div>
+    <div class="cols3" style="margin-top:22px">
+      <div class="card"><h3>Marriage register</h3>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:1.55">Vijayawada municipal
+        record, February 1984. Would settle the marriage date and both spouses&rsquo; names.</div>
+        <div style="margin-top:10px"><button class="btn ghost">Cite</button></div>
+      </div>
+      <div class="card"><h3>School admission record</h3>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:1.55">Would supply a birth
+        year, and with it the birth order Telugu needs in order to name him. The single
+        highest-value document for this record.</div>
+        <div style="margin-top:10px"><button class="btn ghost">Cite</button></div>
+      </div>
+      <div class="card"><h3>Family photograph, 1962</h3>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:1.55">Already uploaded and
+        tagged. Places him with the adoptive household before 1962, which is where the
+        &ldquo;before 1962&rdquo; bound comes from.</div>
+        <div style="margin-top:10px"><button class="btn ghost">Cite</button></div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ── Photos ── -->
+  <sc-if value="{{is.photos}}" hint-placeholder-val="{{false}}">
+  <div class="panel">
+    <div class="photos">
+      <div class="ph-t"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#6B7563" stroke-width="1.5"/><circle cx="8.5" cy="10" r="1.6" stroke="#6B7563" stroke-width="1.4"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" stroke="#6B7563" stroke-width="1.5" stroke-linejoin="round"/></svg><span>1962 &middot; 7 tagged</span></div>
+      <div class="ph-t"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#6B7563" stroke-width="1.5"/><circle cx="8.5" cy="10" r="1.6" stroke="#6B7563" stroke-width="1.4"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" stroke="#6B7563" stroke-width="1.5" stroke-linejoin="round"/></svg><span>1984 &middot; 6 tagged</span></div>
+      <div class="ph-t"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="#6B7563" stroke-width="1.5"/><circle cx="8.5" cy="10" r="1.6" stroke="#6B7563" stroke-width="1.4"/><path d="M4 17l5-4.5 4 3.5 3-2.5 4 3.5" stroke="#6B7563" stroke-width="1.5" stroke-linejoin="round"/></svg><span>2011 &middot; 4 tagged</span></div>
+      <div class="ph-t" style="border-style:dashed"><span style="position:static;color:var(--blue);font-size:12.5px;font-weight:600">+ Add a photo</span></div>
+    </div>
+    <div class="consent">
+      Faces are tagged by a person, never matched automatically. Nothing derived from a face is
+      stored &mdash; only the box someone drew and the name they chose. Tagging a living relative
+      needs their agreement first; the record keeps who tagged whom, and when.
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":1180,"height":1060}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = {tab: 'overview'}; }
+  renderVals() {
+    const t = this.state.tab;
+    const go = (v) => () => this.setState({tab: v});
+    const on = (v) => (t === v ? 'on' : '');
+    return {
+      t: {o: on('overview'), r: on('relations'), t: on('timeline'), s: on('sources'), p: on('photos')},
+      is: {overview: t === 'overview', relations: t === 'relations', timeline: t === 'timeline',
+           sources: t === 'sources', photos: t === 'photos'},
+      go: {overview: go('overview'), relations: go('relations'), timeline: go('timeline'),
+           sources: go('sources'), photos: go('photos')}
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+Shared token block, pasted into each artboard's <helmet> (artboards share nothing at runtime).
+Derived from the existing app: blue #1261bb (primary/interactive), orange #f88e37 (warning),
+green #4d8519 (lineage), brown #aa4c0d (adoptive), ground #f2f2f2 -> warmed toward the olive.

@@ -1,0 +1,369 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+Telugu:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --paper:#EFF1EA; --surface:#FAFBF7; --surface-2:#E7EBDE; --sunk:#E2E7D6;
+      --ink:#1A1E15; --ink-2:#3D4636; --muted:#6B7563; --rule:#D3D9C6; --rule-soft:#E3E7D8;
+      --olive:#3F6D14; --olive-soft:#E4EDD4; --olive-line:#7FA352;
+      --brown:#8F3F0A; --brown-soft:#F4E3D5;
+      --blue:#1261BB; --blue-soft:#DCE8F7;
+      --amber:#A45C0E; --amber-soft:#F9E8D4;
+      --serif:"Faustina","Iowan Old Style",Georgia,serif;
+      --sans:"Source Sans 3","Helvetica Neue",Arial,sans-serif;
+      --telugu:"Noto Serif Telugu","Faustina",serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+           font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { color:#0E4E96; text-decoration:underline; }
+    button { font-family:inherit; font-size:inherit; color:inherit; cursor:pointer; }
+    .lbl { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+           color:var(--muted); margin:0 0 9px; }
+    .te { font-family:var(--telugu); }
+    .tnum { font-variant-numeric:tabular-nums; }
+  </style>
+  <style>
+    .sheet { width:780px; margin:0 auto; background:var(--surface); min-height:1600px; }
+    .sh-head { padding:22px 30px 18px; border-bottom:1px solid var(--rule); }
+    .sh-head h1 { margin:0; font-family:var(--serif); font-size:23px; font-weight:600;
+                  letter-spacing:-.015em; }
+    .sh-head p { margin:5px 0 0; font-size:13px; color:var(--muted); max-width:60ch;
+                 line-height:1.5; }
+    .body { padding:24px 30px 30px; }
+    .grp + .grp { margin-top:26px; padding-top:22px; border-top:1px solid var(--rule-soft); }
+
+    .fld { margin-bottom:14px; }
+    .fld > label { display:block; font-size:11.5px; font-weight:600; color:var(--ink-2);
+                   margin-bottom:5px; }
+    .fld .hint { font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.45; }
+    /* underline inputs: the one interaction pattern the current app already has */
+    .inp { width:100%; height:34px; border:none; border-bottom:1px solid #9AA48D;
+           background:transparent; border-radius:0; font-family:inherit; font-size:14px;
+           color:var(--ink); padding:0 2px; }
+    .inp:focus { outline:none; border-bottom:2px solid var(--blue); }
+    .inp.is-telugu { font-family:var(--telugu); }
+    .inp.short { max-width:120px; }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .req { color:var(--brown); }
+
+    .seg { display:inline-flex; flex-wrap:wrap; gap:0; border:1px solid var(--rule);
+           border-radius:3px; overflow:hidden; background:var(--paper); }
+    .seg button { border:none; background:none; padding:0 11px; height:30px; font-size:12px;
+                  font-weight:600; color:var(--muted); }
+    .seg button + button { border-left:1px solid var(--rule); }
+    .seg button.on { background:var(--olive); color:#fff; }
+
+    .radios { display:flex; gap:16px; }
+    .radio { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ink-2); }
+    .radio .dot { width:15px; height:15px; border-radius:50%; border:1.5px solid #9AA48D;
+                  display:grid; place-items:center; }
+    .radio .dot.on { border-color:var(--blue); border-width:5px; }
+
+    .datebox { border:1px solid var(--rule); border-radius:4px; background:var(--paper);
+               padding:14px 15px; }
+    .dparts { display:flex; align-items:flex-end; gap:12px; margin-top:14px; }
+    .dparts .sub { font-size:10.5px; color:var(--muted); margin-bottom:4px; display:block;
+                   letter-spacing:.04em; text-transform:uppercase; font-weight:700; }
+    .cal { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px;
+           color:var(--muted); }
+    .cal select { font-family:inherit; font-size:12px; border:1px solid var(--rule);
+                  border-radius:3px; background:var(--surface); padding:3px 6px; color:var(--ink-2); }
+
+    .preview { margin-top:16px; background:var(--surface); border:1px solid var(--rule);
+               border-radius:3px; padding:12px 14px; }
+    .preview .pl { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+                   color:var(--muted); }
+    .preview .pv { font-family:var(--serif); font-size:17px; font-weight:600; margin-top:4px; }
+    .preview .pm { font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.5;
+                   font-variant-numeric:tabular-nums; }
+
+    .nudge { display:flex; gap:10px; background:var(--olive-soft); border-left:3px solid var(--olive);
+             border-radius:0 3px 3px 0; padding:11px 13px; margin-top:6px; }
+    .nudge p { margin:0; font-size:12.5px; color:#2B4A0E; line-height:1.55; }
+    .nudge b { font-weight:600; }
+
+    .foot { position:sticky; bottom:0; background:var(--surface);
+            border-top:1px solid var(--rule); padding:14px 30px;
+            display:flex; align-items:center; gap:12px; }
+    .foot .sum { font-size:12px; color:var(--muted); }
+    .foot .sp { margin-left:auto; }
+    .btn { height:36px; padding:0 18px; border-radius:3px; border:1px solid var(--blue);
+           background:var(--blue); color:#fff; font-size:13px; font-weight:600;
+           display:inline-grid; place-items:center; }
+    .btn:hover { background:#0E4E96; }
+    .btn.ghost { background:var(--surface); color:var(--blue); }
+  </style>
+</helmet>
+
+<div class="sheet">
+  <div class="sh-head">
+    <h1>Add a person</h1>
+    <p>Only a name is required. Everything else can be partial, approximate, or left out &mdash; a
+       record with an honest gap is worth more than one with an invented date.</p>
+  </div>
+
+  <div class="body">
+
+    <div class="grp">
+      <p class="lbl">Name</p>
+      <div class="two">
+        <div class="fld">
+          <label for="f1">Given name <span class="req">*</span></label>
+          <input class="inp" value="Harinath" id="f1">
+        </div>
+        <div class="fld">
+          <label for="f2">Given name in Telugu</label>
+          <input class="inp is-telugu" value="హరినాథ్">
+        </div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>Surname</label>
+          <input class="inp" value="Sharma" id="f2">
+          <div class="hint">Optional. Leave blank if it isn&rsquo;t known.</div>
+        </div>
+        <div class="fld">
+          <label for="f3">Surname in Telugu</label>
+          <input class="inp is-telugu" value="శర్మ">
+        </div>
+      </div>
+      <div class="fld">
+        <label>This name is a&hellip;</label>
+        <div class="seg">
+          <button class="{{nt.birth}}" onClick="{{setNt.birth}}">Birth name</button>
+          <button class="{{nt.married}}" onClick="{{setNt.married}}">Married name</button>
+          <button class="{{nt.adoptive}}" onClick="{{setNt.adoptive}}">Adoptive name</button>
+          <button class="{{nt.aka}}" onClick="{{setNt.aka}}">Also known as</button>
+        </div>
+        <div class="hint">Names are kept as a list, so adding an adoptive surname later never
+          overwrites the one someone was born with.</div>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p class="lbl">Identity</p>
+      <div class="fld">
+        <label>Sex on the record</label>
+        <div class="radios">
+          <sc-for list="{{sexes}}" as="s" hint-placeholder-count="4">
+            <button class="radio" aria-pressed="{{s.on}}" onClick="{{s.pick}}" style="border:none;background:none;padding:8px 0;min-height:44px">
+              <span class="dot {{s.cls}}"></span>{{s.label}}
+            </button>
+          </sc-for>
+        </div>
+        <div class="hint">Recorded as a fact about the document, not used to decide what a
+          relationship is called &mdash; so &ldquo;unknown&rdquo; is a real answer and nothing downstream breaks.</div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>Gender, if it differs</label>
+          <input class="inp" placeholder="Optional, free text" id="f3">
+        </div>
+        <div class="fld">
+          <label for="f4">Living</label>
+          <div class="seg">
+            <button class="{{lv.yes}}" onClick="{{setLv.yes}}">Yes</button>
+            <button class="{{lv.no}}" onClick="{{setLv.no}}">No</button>
+            <button class="{{lv.unk}}" onClick="{{setLv.unk}}">Unknown</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p class="lbl">Born</p>
+      <div class="datebox">
+        <div class="seg">
+          <sc-for list="{{modes}}" as="m" hint-placeholder-count="7">
+            <button class="{{m.cls}}" aria-pressed="{{m.on}}" onClick="{{m.pick}}">{{m.label}}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{d.showOne}}" hint-placeholder-val="{{true}}">
+          <div class="dparts">
+            <label><span class="sub">Year</span><input class="inp short tnum" value="{{d.y1}}"></label>
+            <sc-if value="{{d.showFull}}" hint-placeholder-val="{{true}}">
+              <label><span class="sub">Month</span><input class="inp short" placeholder="—" style="max-width:96px"></label>
+              <label><span class="sub">Day</span><input class="inp short" placeholder="—" style="max-width:72px"></label>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{d.showTwo}}" hint-placeholder-val="{{false}}">
+          <div class="dparts">
+            <label><span class="sub">Earliest year</span><input class="inp short tnum" value="{{d.y1}}"></label>
+            <span style="padding-bottom:8px;color:var(--muted)">and</span>
+            <label><span class="sub">Latest year</span><input class="inp short tnum" value="{{d.y2}}"></label>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{d.showNone}}" hint-placeholder-val="{{false}}">
+          <div class="hint" style="margin-top:14px">Nothing to enter. The record will say the birth
+            date is unknown, rather than implying a date nobody has.</div>
+        </sc-if>
+
+        <div class="cal">
+          <span>Calendar</span>
+          <select>
+            <option>Gregorian</option>
+            <option>Julian</option>
+            <option>Telugu (Śālivāhana Śaka)</option>
+            <option>Hindu lunar</option>
+          </select>
+          <span style="color:var(--muted)">&middot; the original text is kept either way</span>
+        </div>
+
+        <div class="preview">
+          <div class="pl">The record will read</div>
+          <div class="pv">{{d.reads}}</div>
+          <div class="pm">{{d.sorts}}</div>
+        </div>
+      </div>
+
+      <div class="nudge">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:2px">
+          <circle cx="12" cy="12" r="9" stroke="#3F6D14" stroke-width="1.7"/>
+          <path d="M12 7.6v.1M12 11v5.4" stroke="#3F6D14" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <p>{{d.why}}</p>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p class="lbl">Places and links</p>
+      <div class="two">
+        <div class="fld">
+          <label>Birthplace</label>
+          <input class="inp" value="Vijayawada, Andhra Pradesh, India" id="f4">
+          <div class="hint">Matched against places already in the tree; coordinates are looked
+            up later, in the background, never while you wait.</div>
+        </div>
+        <div class="fld">
+          <label for="f5">Attach to</label>
+          <input class="inp" placeholder="Search for a parent, spouse or child" id="f5">
+          <div class="hint">Optional. An unattached person is a valid record &mdash; you can link
+            them once you know how they fit.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p class="lbl">Where this came from</p>
+      <div class="fld">
+        <label for="f6">Source</label>
+          <input class="inp" placeholder="A document, a photograph, or who told you" id="f6">
+        <div class="hint">Not required, but the difference between a family diagram and a family
+          history. An uncited fact can never be settled when two relatives disagree.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    <span class="sum">{{d.badge}}</span>
+    <span class="sp"></span>
+    <button class="btn ghost">Save and add another</button>
+    <button class="btn">Save person</button>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":780,"height":1620}}'>
+const MODES = [
+  {id:'exact',   label:'Exact'},
+  {id:'about',   label:'About'},
+  {id:'before',  label:'Before'},
+  {id:'after',   label:'After'},
+  {id:'between', label:'Between'},
+  {id:'year',    label:'Year only'},
+  {id:'unknown', label:'Unknown'}
+];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {mode:'about', y1:1955, y2:1957, nt:'adoptive', living:'yes', sex:'M'};
+  }
+
+  renderVals() {
+    const st = this.state;
+    const setMode = (id) => () => this.setState({mode:id});
+    const m = st.mode, y1 = st.y1, y2 = st.y2;
+
+    const READS = {
+      exact:   y1 + ' — add a month and day',
+      about:   'about ' + y1,
+      before:  'before ' + y1,
+      after:   'after ' + y1,
+      between: 'between ' + y1 + ' and ' + y2,
+      year:    String(y1),
+      unknown: 'unknown'
+    };
+    const SORTS = {
+      exact:   'Stored as a single day once the month and day are filled in. Sorts and calculates ages exactly.',
+      about:   'Stored as ' + (y1-2) + '-01-01 to ' + (y1+2) + '-12-31. Ages are given as a range, never a false single number.',
+      before:  'Stored as an open interval ending ' + y1 + '-12-31. Sorts before anything known to be later.',
+      after:   'Stored as an open interval starting ' + y1 + '-01-01.',
+      between: 'Stored as ' + y1 + '-01-01 to ' + y2 + '-12-31. Both bounds came from real evidence.',
+      year:    'Stored as ' + y1 + '-01-01 to ' + y1 + '-12-31. Sorts by year; no month or day is implied.',
+      unknown: 'No interval stored. The person still sorts into a generation from their parents and children.'
+    };
+    const WHY = {
+      exact:   'Use this only when a document gives the day. Everything else is more honestly one of the other six.',
+      about:   'The current app would reject this outright: it demands yyyy-MM-dd and parses it strictly, so "about 1955" cannot be entered at all. Most people more than two generations back have no exact birth date, which is why so many family trees are full of invented 1 January dates.',
+      before:  'Bounds are real evidence. "Born before 1962" from a dated photograph is far more useful than a guess, and it is still sortable.',
+      after:   'Pairs with a bound from the other direction to narrow a range as documents turn up.',
+      between: 'Two bounds from two different documents. This is what genealogical research actually produces.',
+      year:    'A year with no month is extremely common on older records. The current form will not accept it: its year field is also clamped to a minimum of 1900, so no ancestor born earlier can be entered.',
+      unknown: 'Better than a placeholder. A person with no date still holds their place in the tree through their parents and children.'
+    };
+    const BADGE = {
+      exact:'Exact date', about:'Approximate', before:'Upper bound', after:'Lower bound',
+      between:'Range', year:'Year only', unknown:'No date'
+    };
+
+    const sexes = [['M','Male'],['F','Female'],['I','Intersex'],['U','Unknown']].map((s) => ({
+      label: s[1], cls: st.sex === s[0] ? 'on' : '', on: st.sex === s[0],
+      pick: () => this.setState({sex: s[0]})
+    }));
+
+    const seg = (cur) => (v) => (cur === v ? 'on' : '');
+    const ntCls = seg(st.nt), lvCls = seg(st.living);
+
+    return {
+      modes: MODES.map((x) => ({label:x.label, cls: m === x.id ? 'on' : '',
+                                on: m === x.id, pick: setMode(x.id)})),
+      sexes: sexes,
+      nt: {birth:ntCls('birth'), married:ntCls('married'), adoptive:ntCls('adoptive'), aka:ntCls('aka')},
+      setNt: {
+        birth: () => this.setState({nt:'birth'}), married: () => this.setState({nt:'married'}),
+        adoptive: () => this.setState({nt:'adoptive'}), aka: () => this.setState({nt:'aka'})
+      },
+      lv: {yes:lvCls('yes'), no:lvCls('no'), unk:lvCls('unknown')},
+      setLv: {
+        yes: () => this.setState({living:'yes'}), no: () => this.setState({living:'no'}),
+        unk: () => this.setState({living:'unknown'})
+      },
+      d: {
+        showOne:  m !== 'between' && m !== 'unknown',
+        showTwo:  m === 'between',
+        showNone: m === 'unknown',
+        showFull: m === 'exact',
+        y1: String(y1), y2: String(y2),
+        reads: READS[m], sorts: SORTS[m], why: WHY[m], badge: BADGE[m]
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
