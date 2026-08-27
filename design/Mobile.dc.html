@@ -1,0 +1,266 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+Telugu:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --paper:#EFF1EA; --surface:#FAFBF7; --surface-2:#E7EBDE; --sunk:#E2E7D6;
+      --ink:#1A1E15; --ink-2:#3D4636; --muted:#6B7563; --rule:#D3D9C6; --rule-soft:#E3E7D8;
+      --olive:#3F6D14; --olive-soft:#E4EDD4; --olive-line:#7FA352;
+      --brown:#8F3F0A; --brown-soft:#F4E3D5;
+      --blue:#1261BB; --blue-soft:#DCE8F7;
+      --amber:#A45C0E; --amber-soft:#F9E8D4;
+      --serif:"Faustina","Iowan Old Style",Georgia,serif;
+      --sans:"Source Sans 3","Helvetica Neue",Arial,sans-serif;
+      --telugu:"Noto Serif Telugu","Faustina",serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+           font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { color:#0E4E96; text-decoration:underline; }
+    button { font-family:inherit; font-size:inherit; color:inherit; cursor:pointer; }
+    .lbl { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+           color:var(--muted); margin:0 0 9px; }
+    .te { font-family:var(--telugu); }
+    .tnum { font-variant-numeric:tabular-nums; }
+  </style>
+  <style>
+    body { font-size:15px; }
+    .phone { width:390px; height:844px; display:flex; flex-direction:column;
+             background:var(--paper); overflow:hidden; }
+    /* The top 47px is left empty on purpose: the real status bar draws there. */
+    .statusgap { height:47px; flex:none; background:var(--surface); }
+
+    .bar { flex:none; background:var(--surface); border-bottom:1px solid var(--rule);
+           padding:0 14px 11px; display:flex; align-items:center; gap:11px; }
+    .bar .t { font-family:var(--serif); font-size:19px; font-weight:600; letter-spacing:-.012em; }
+    .icobtn { width:44px; height:44px; margin:-11px -8px -11px 0; border:none; background:none;
+              display:grid; place-items:center; }
+    .langpill { margin-left:auto; display:flex; border:1px solid var(--rule); border-radius:22px;
+                overflow:hidden; background:var(--paper); }
+    .langpill button { border:none; background:none; min-height:44px; padding:0 14px;
+                       font-size:13px; font-weight:700; color:var(--muted); letter-spacing:.03em; }
+    .langpill button.on { background:var(--olive); color:#fff; }
+    .langpill button.te { font-family:var(--telugu); font-size:15px; font-weight:500; }
+
+    .root { flex:none; background:var(--olive-soft); border-bottom:1px solid var(--olive-line);
+            padding:11px 16px; display:flex; align-items:center; gap:11px; }
+    .root .av { width:38px; height:38px; flex:none; border-radius:50%; background:var(--surface);
+                border:1px solid var(--olive-line); display:grid; place-items:center;
+                font-family:var(--serif); font-size:14px; font-weight:600; color:var(--olive); }
+    .root .nm { font-family:var(--serif); font-size:15px; font-weight:600; line-height:1.2; }
+    .root .te2 { font-family:var(--telugu); font-size:12.5px; color:var(--olive); }
+    .root .sw { margin-left:auto; font-size:12px; font-weight:600; color:var(--blue);
+                min-height:44px; display:grid; place-items:center; padding:0 4px;
+                border:none; background:none; }
+
+    .scroll { flex:1; overflow-y:auto; padding:4px 0 12px; }
+    .grp { padding:16px 16px 4px; }
+    .grp h3 { margin:0 0 2px; font-size:10.5px; font-weight:700; letter-spacing:.11em;
+              text-transform:uppercase; color:var(--muted); }
+    .grp .sub { font-size:12.5px; color:var(--muted); margin-bottom:10px; line-height:1.45; }
+
+    .strip { display:flex; gap:10px; overflow-x:auto; padding:0 16px 4px;
+             scroll-snap-type:x proximity; }
+    .strip::-webkit-scrollbar { height:0; }
+    .pcard { scroll-snap-align:start; flex:none; width:158px; min-height:44px;
+             background:var(--surface); border:1px solid var(--rule); border-radius:5px;
+             padding:10px 11px 11px; text-align:left; }
+    .pcard.adopt { border-style:dashed; border-color:var(--brown); }
+    .pcard.me { border-color:var(--olive); box-shadow:0 0 0 2px var(--olive-soft); }
+    .pcard.sel { border-color:var(--blue); box-shadow:0 0 0 2px var(--blue-soft); }
+    .pcard .needs { display:block; margin-top:6px; font-size:11.5px; font-weight:600;
+                    color:var(--amber); }
+    .pcard .quiet { display:block; margin-top:6px; font-size:11.5px; color:var(--muted); }
+    .pcard .links { display:block; margin-top:6px; font-size:11.5px; font-weight:600;
+                    color:var(--olive); }
+    .pcard .links::before { content:"⁂"; margin-right:4px; opacity:.75; }
+    .pcard .kin.is-open { background:var(--blue-soft); color:var(--blue);
+                          border:1px dashed var(--blue); }
+    .pcard .sym { width:8px; height:8px; border:1.5px solid var(--muted); display:inline-block;
+                  vertical-align:1px; margin-right:5px; }
+    .pcard .sym.f { border-radius:50%; }
+    .pcard .nm { display:block; font-family:var(--serif); font-size:14.5px; font-weight:600;
+                 line-height:1.22; }
+    .pcard .te2 { display:block; font-family:var(--telugu); font-size:12.5px; color:var(--ink-2);
+                  line-height:1.35; margin-top:1px; }
+    .pcard .yr { display:block; font-size:12px; color:var(--muted); margin-top:4px;
+                 font-variant-numeric:tabular-nums; }
+    .pcard .kin { display:inline-block; margin-top:7px; font-size:12.5px; font-weight:600;
+                  color:var(--olive); background:var(--olive-soft); border-radius:2px;
+                  padding:2px 6px; }
+    .pcard .kin.tel { font-family:var(--telugu); text-transform:none; letter-spacing:0;
+                      font-size:12px; font-weight:500; }
+    .pcard .flag { display:inline-block; width:7px; height:7px; border-radius:50%;
+                   background:var(--amber); margin-left:5px; vertical-align:1px; }
+
+    .tabs { flex:none; display:flex; background:var(--surface);
+            border-top:1px solid var(--rule); padding-bottom:18px; }
+    .tabs button { flex:1; min-height:52px; border:none; background:none; display:grid;
+                   place-items:center; gap:3px; padding:7px 0 0; font-size:10.5px;
+                   font-weight:600; color:var(--muted); }
+    .tabs button.on { color:var(--olive); }
+  </style>
+</helmet>
+
+<div class="phone">
+  <div class="statusgap"></div>
+
+  <div class="bar">
+    <span class="t">Family Tree</span>
+    <button class="icobtn" aria-label="Search">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="6.5" stroke="#3D4636" stroke-width="1.8"/>
+        <path d="M16 16l4.5 4.5" stroke="#3D4636" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <span class="langpill">
+      <button class="{{l.enCls}}" aria-pressed="{{l.enOn}}" onClick="{{l.en}}">EN</button>
+      <button class="te {{l.teCls}}" aria-pressed="{{l.teOn}}" onClick="{{l.te}}">తె</button>
+    </span>
+  </div>
+
+  <div class="root">
+    <span class="av">KS</span>
+    <span>
+      <span class="nm">Aditya Varun</span>
+      <span class="te2">ఆదిత్య వరుణ్</span>
+    </span>
+    <button class="sw">Change</button>
+  </div>
+
+  <div class="scroll">
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+      <div>
+        <div class="grp">
+          <h3>{{g.title}}</h3>
+          <div class="sub">{{g.sub}}</div>
+        </div>
+        <div class="strip">
+          <sc-for list="{{g.people}}" as="p" hint-placeholder-count="3">
+            <button class="pcard {{p.cls}}" onClick="{{p.pick}}">
+              <span class="nm"><span class="sym {{p.sym}}"></span>{{p.name}}</span>
+              <span class="te2">{{p.te}}</span>
+              <span class="yr">{{p.years}}</span>
+              <span class="kin {{l.chipCls}} {{p.kinCls}}">{{p.kin}}</span>
+              <sc-if value="{{p.links}}" hint-placeholder-val="{{false}}">
+                <span class="links">{{p.links}}</span>
+              </sc-if>
+              <sc-if value="{{p.conflict}}" hint-placeholder-val="{{false}}">
+                <span class="needs">Contradiction to settle</span>
+              </sc-if>
+              <sc-if value="{{p.note}}" hint-placeholder-val="{{false}}">
+                <span class="quiet">Not confirmed</span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div class="tabs">
+    <button class="on">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <path d="M12 21V11" stroke="#3F6D14" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M12 11C12 6.5 8.5 3.5 4.5 3.5c0 4.5 3 7.5 7.5 7.5Z" stroke="#3F6D14" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M12 14c0-3.6 2.8-6 6-6 0 3.6-2.4 6-6 6Z" stroke="#7FA352" stroke-width="1.7" stroke-linejoin="round"/>
+      </svg>
+      Tree
+    </button>
+    <button>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="9" r="3.2" stroke="#6B7563" stroke-width="1.6"/>
+        <path d="M3.5 19c0-3.2 2.5-5.4 5.5-5.4s5.5 2.2 5.5 5.4" stroke="#6B7563" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M16 7.2a3 3 0 010 5.6M17.5 19c0-2.4-.9-4.2-2.4-5.2" stroke="#6B7563" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      People
+    </button>
+    <button>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="5.5" width="18" height="13" rx="2" stroke="#6B7563" stroke-width="1.6"/>
+        <circle cx="8.5" cy="10.5" r="1.6" stroke="#6B7563" stroke-width="1.5"/>
+        <path d="M4 16.5l4.5-4 3.5 3 3-2.5 4 3.5" stroke="#6B7563" stroke-width="1.6" stroke-linejoin="round"/>
+      </svg>
+      Photos
+    </button>
+    <button>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <path d="M12 21s6.5-6 6.5-10.5A6.5 6.5 0 105.5 10.5C5.5 15 12 21 12 21Z" stroke="#6B7563" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle cx="12" cy="10.2" r="2.4" stroke="#6B7563" stroke-width="1.5"/>
+      </svg>
+      Places
+    </button>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+/* Same kinship pairs as the desktop tree, grouped the way a phone can actually show them:
+   generation bands you swipe through, rather than a canvas you pinch. */
+const GROUPS = [
+  {title:'Parents', sub:'Chandra Mohan Babu and Deepa Latha', people:[
+    {name:'Chandra Mohan Babu', te:'చంద్ర మోహన్ బాబు', years:'b. 1958', sym:'',  en:'Father', tel:'నాన్న'},
+    {name:'Deepa Latha',        te:'దీప లత',       years:'b. 1962', sym:'f', en:'Mother', tel:'అమ్మ'}
+  ]},
+  {title:'Brothers and sisters', sub:'One brother recorded', people:[
+    {name:'Bharath Kiran', te:'భరత్ కిరణ్', years:'b. 1993', sym:'', en:'Younger brother', tel:'తమ్ముడు'}
+  ]},
+  {title:'Grandparents', sub:'Paternal line · maternal line not yet recorded', people:[
+    {name:'Eshwar Datta', te:'ఈశ్వర్ దత్త', years:'1928–2004', sym:'',  en:'Grandfather', tel:'తాత'},
+    {name:'Girija',       te:'గిరిజ',      years:'1932–2011', sym:'f', en:'Grandmother', tel:'నానమ్మ'}
+  ]},
+  {title:'Uncles and aunts', sub:'Four on your father’s side. Two have no recorded birth year, so Telugu cannot yet choose between Peddananna and Chinnanna.', people:[
+    {name:'Harinath', te:'హరినాథ్', years:'year not recorded', sym:'', en:'Father’s brother', tel:'పెద్దనాన్న / చిన్నాన్న', adopt:true, links:'2 ways related to you', open:true},
+    {name:'Madhava',   te:'మాధవ',     years:'year not recorded', sym:'', en:'Father’s brother', tel:'పెద్దనాన్న / చిన్నాన్న', open:true},
+    {name:'Yeshwanth',     te:'యశ్వంత్',      years:'b. 1964',    sym:'',  en:'Father’s younger br.', tel:'చిన్నాన్న'},
+    {name:'Gowri', te:'గౌరి',  years:'b. 1961',    sym:'f', en:'Father’s sister',      tel:'అత్త'}
+  ]},
+  {title:'Cousins', sub:'All seven are “first cousin” in English. Telugu uses five different words, because it splits parallel from cross and elder from younger.', people:[
+    {name:'Lokesh',       te:'లోకేష్',      years:'b. 1991', sym:'',  en:'First cousin', tel:'తమ్ముడు', links:'2 ways related to you'},
+    {name:'Manoj',       te:'మనోజ్',      years:'b. 1995', sym:'',  en:'First cousin', tel:'తమ్ముడు', links:'2 ways related to you'},
+    {name:'Padmini',      te:'పద్మిని',      years:'b. 1984', sym:'f', en:'First cousin', tel:'అక్క'},
+    {name:'Raghava',     te:'రాఘవ',    years:'b. 1987', sym:'',  en:'First cousin', tel:'అన్నయ్య'},
+    {name:'Hema',         te:'హేమ',         years:'b. 1986', sym:'f', en:'First cousin', tel:'వదిన', conflict:true},
+    {name:'Indira',       te:'ఇందిర',       years:'b. 1989', sym:'f', en:'First cousin', tel:'వదిన'},
+    {name:'Chandana Sri', te:'చందన శ్రీ', years:'b. 1992', sym:'f', en:'First cousin', tel:'చెల్లి', note:true}
+  ]}
+];
+
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = {lang:'en', sel:null}; }
+  renderVals() {
+    const te = this.state.lang === 'te';
+    const sel = this.state.sel;
+    return {
+      l: {
+        en: () => this.setState({lang:'en'}), te: () => this.setState({lang:'te'}),
+        enCls: te ? '' : 'on', teCls: te ? 'on' : '',
+        enOn: !te, teOn: te, chipCls: te ? 'tel' : ''
+      },
+      groups: GROUPS.map((g) => ({
+        title: g.title, sub: g.sub,
+        people: g.people.map((p) => ({
+          name: p.name, te: p.te, years: p.years, sym: p.sym,
+          kin: te ? p.tel : p.en,
+          kinCls: (te && p.open) ? 'is-open' : '',
+          cls: (p.adopt ? 'adopt ' : '') + (sel === p.name ? 'sel' : ''),
+          links: p.links || '',
+          conflict: !!p.conflict,
+          note: !!p.note,
+          pick: () => this.setState({sel: p.name})
+        }))
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

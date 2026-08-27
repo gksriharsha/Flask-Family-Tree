@@ -1,0 +1,26 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["venv", ".venv", "tests/_data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# The module and function names (Tree, gremlin_Interface, add_person_endpoint, createPersonObject)
+# are the project's established conventions and are part of the public surface the Angular client
+# and the CLI already use. Renaming them is a separate, mechanical change; pep8-naming is not
+# enabled so that lint stays a signal about defects rather than a wall of style noise.
+ignore = [
+    "B008",    # Flask/Click patterns legitimately call functions in defaults
+    "RUF012",  # Configuration classes intentionally hold mutable class attributes
+    "RUF001",  # typographic apostrophes are deliberate in user-facing copy and in Telugu glosses
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+"Tree/Utils/RelationReducer.py" = ["E501"]   # the kinship table is more readable unwrapped
+"Tree/seed.py" = ["E501"]                    # generated fixture data, one person per line
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:gremlin_python.*"]

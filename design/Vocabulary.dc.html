@@ -1,0 +1,291 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+Telugu:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --paper:#EFF1EA; --surface:#FAFBF7; --surface-2:#E7EBDE; --sunk:#E2E7D6;
+      --ink:#1A1E15; --ink-2:#3D4636; --muted:#6B7563; --rule:#D3D9C6; --rule-soft:#E3E7D8;
+      --olive:#3F6D14; --olive-soft:#E4EDD4; --olive-line:#7FA352;
+      --brown:#8F3F0A; --brown-soft:#F4E3D5;
+      --blue:#1261BB; --blue-soft:#DCE8F7;
+      --amber:#A45C0E; --amber-soft:#F9E8D4;
+      --serif:"Faustina","Iowan Old Style",Georgia,serif;
+      --sans:"Source Sans 3","Helvetica Neue",Arial,sans-serif;
+      --telugu:"Noto Serif Telugu","Faustina",serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+           font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { color:#0E4E96; text-decoration:underline; }
+    button { font-family:inherit; font-size:inherit; color:inherit; cursor:pointer; }
+    .lbl { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+           color:var(--muted); margin:0 0 9px; }
+    .te { font-family:var(--telugu); }
+    .tnum { font-variant-numeric:tabular-nums; }
+  </style>
+  <style>
+    .wrap { width:940px; margin:0 auto; padding:26px 30px 40px; }
+    h1 { margin:0; font-family:var(--serif); font-size:25px; font-weight:600; letter-spacing:-.015em; }
+    .sub { margin:6px 0 0; font-size:13.5px; color:var(--ink-2); line-height:1.55; max-width:74ch; }
+
+    .sidebar { display:flex; align-items:center; gap:14px; margin:20px 0 6px;
+               padding:12px 14px; background:var(--surface); border:1px solid var(--rule);
+               border-radius:4px; }
+    .sidebar .sl { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+                   color:var(--muted); }
+    .seg { display:inline-flex; border:1px solid var(--rule); border-radius:3px; overflow:hidden;
+           background:var(--paper); }
+    .seg button { border:none; background:none; height:30px; padding:0 14px; font-size:12.5px;
+                  font-weight:600; color:var(--muted); }
+    .seg button + button { border-left:1px solid var(--rule); }
+    .seg button.on { background:var(--olive); color:#fff; }
+    .sidebar .note { font-size:12px; color:var(--muted); line-height:1.45; }
+
+    table { width:100%; border-collapse:collapse; margin-top:14px; background:var(--surface);
+            border:1px solid var(--rule); border-radius:4px; overflow:hidden; }
+    th { text-align:left; font-size:10px; font-weight:700; letter-spacing:.09em;
+         text-transform:uppercase; color:var(--muted); padding:10px 14px;
+         border-bottom:1px solid var(--rule); background:var(--surface-2); }
+    td { padding:11px 14px; border-bottom:1px solid var(--rule-soft); vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    tr.on td { background:var(--olive-soft); }
+
+    .rel { font-size:13px; color:var(--ink-2); line-height:1.35; }
+    .rel b { display:block; font-family:var(--serif); font-size:14.5px; font-weight:600;
+             color:var(--ink); }
+
+    .word { display:inline-flex; align-items:center; gap:8px; }
+    .word .te { font-family:var(--telugu); font-size:17px; font-weight:500; color:var(--olive); }
+    .word .ro { font-size:11.5px; color:var(--muted); }
+
+    .alts { display:flex; flex-wrap:wrap; gap:6px; }
+    .alt { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 9px;
+           border:1px solid var(--rule); border-radius:13px; background:var(--paper);
+           font-size:12px; color:var(--ink-2); white-space:nowrap; }
+    .alt:hover { border-color:var(--olive); background:var(--olive-soft); color:var(--olive); }
+    .alt .te { font-family:var(--telugu); font-size:13.5px; }
+    .alt .u { font-size:10.5px; color:var(--muted); }
+    .alt:hover .u { color:var(--olive); }
+
+    .own { display:flex; align-items:center; gap:8px; }
+    .own input { width:150px; height:30px; border:none; border-bottom:1px solid #9AA48D;
+                 background:transparent; font-family:var(--telugu); font-size:15px;
+                 color:var(--ink); padding:0 2px; }
+    .own input:focus { outline:none; border-bottom:2px solid var(--blue); }
+    .own input { width:104px; }
+    .own .add { height:28px; padding:0 10px; border:1px solid var(--blue); border-radius:3px;
+                background:var(--surface); color:var(--blue); font-size:12px; font-weight:600; }
+    .own .add:hover { background:var(--blue-soft); }
+    .alt.added { border-style:dashed; border-color:var(--olive); color:var(--olive); }
+
+    .foot { margin-top:18px; display:flex; gap:14px; align-items:flex-start;
+            background:var(--sunk); border-radius:4px; padding:13px 15px; }
+    .foot p { margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.6; max-width:78ch; }
+    .foot b { color:var(--ink); font-weight:600; }
+  </style>
+</helmet>
+
+<div class="wrap">
+  <h1>Family vocabulary</h1>
+  <p class="sub">The same relation is called different things depending on who is speaking. Your
+    father&rsquo;s people say <span class="te">చిన్నాన్న</span>; your mother&rsquo;s say
+    <span class="te">కక్కయ్య</span>. Neither is a correction of the other. Set the words each side
+    actually uses, and the tree speaks in them.</p>
+
+  <div class="sidebar">
+    <span class="sl">Editing</span>
+    <span class="seg">
+      <button class="{{side.pCls}}" aria-pressed="{{side.pOn}}" onClick="{{side.paternal}}">Father&rsquo;s side</button>
+      <button class="{{side.mCls}}" aria-pressed="{{side.mOn}}" onClick="{{side.maternal}}">Mother&rsquo;s side</button>
+    </span>
+    <span class="note">{{side.note}}</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:27%">Relation</th>
+        <th style="width:22%">This side says</th>
+        <th style="width:33%">Other words for it</th>
+        <th style="width:18%">Your own</th>
+      </tr>
+    </thead>
+    <tbody>
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+        <tr class="{{r.cls}}">
+          <td><span class="rel"><b>{{r.en}}</b>{{r.note}}</span></td>
+          <td>
+            <span class="word">
+              <span class="te">{{r.te}}</span>
+              <span class="ro">{{r.roman}}</span>
+            </span>
+          </td>
+          <td>
+            <span class="alts">
+              <sc-for list="{{r.alts}}" as="a" hint-placeholder-count="2">
+                <button class="alt {{a.addedCls}}" onClick="{{a.pick}}">
+                  <span class="te">{{a.te}}</span><span class="u">{{a.usage}}</span>
+                </button>
+              </sc-for>
+            </span>
+          </td>
+          <td>
+            <span class="own">
+              <input value="{{r.draft}}" onInput="{{r.setDraft}}" placeholder="Add a word"
+                     aria-label="A word your family uses">
+              <button class="add" onClick="{{r.add}}">Add</button>
+            </span>
+          </td>
+        </tr>
+      </sc-for>
+    </tbody>
+  </table>
+
+  <div class="foot">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" style="flex:none;margin-top:2px">
+      <circle cx="12" cy="12" r="9" stroke="#3F6D14" stroke-width="1.7"/>
+      <path d="M12 7.6v.1M12 11v5.4" stroke="#3F6D14" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <p><b>These are suggestions, not authority.</b> They are the forms in common use, offered as a
+      starting point &mdash; the family is the authority on its own words, so every one of them can
+      be replaced. Nothing here changes a single relationship: the tree works out <em>who</em>
+      someone is from the parent and union links, and this page only decides what that gets
+      <em>called</em>. That is why a word can be changed, or a whole regional vocabulary swapped,
+      without touching the data.</p>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":940,"height":1000}}'>
+/* The same table the tree renders from. Editing here re-labels the tree; it never alters a
+   relationship, because the relationship is a struct and these are only its words. */
+const ROWS = [
+  {key: 'fyb', en: 'Father’s younger brother', note: 'differs most between the two sides',
+   paternal: {te: 'చిన్నాన్న', roman: 'Chinnanna'},
+   maternal: {te: 'కక్కయ్య', roman: 'Kakkayya'},
+   alts: [{te: 'బాబాయి', roman: 'Babai', usage: 'widely used'},
+          {te: 'పినతండ్రి', roman: 'Pinathandri', usage: 'formal'}]},
+  {key: 'feb', en: 'Father’s elder brother', note: '',
+   paternal: {te: 'పెద్దనాన్న', roman: 'Peddananna'},
+   alts: [{te: 'పెదనాన్న', roman: 'Pedananna', usage: 'shorter'},
+          {te: 'దొడ్డనాన్న', roman: 'Doddananna', usage: 'Rayalaseema'}]},
+  {key: 'fz', en: 'Father’s sister', note: '',
+   paternal: {te: 'అత్త', roman: 'Attha'},
+   alts: [{te: 'మేనత్త', roman: 'Menattha', usage: 'formal'}]},
+  {key: 'mb', en: 'Mother’s brother', note: '',
+   paternal: {te: 'మామయ్య', roman: 'Maamayya'},
+   alts: [{te: 'మేనమామ', roman: 'Menamama', usage: 'formal'}]},
+  {key: 'mez', en: 'Mother’s elder sister', note: '',
+   paternal: {te: 'పెద్దమ్మ', roman: 'Peddamma'},
+   alts: [{te: 'పెత్తల్లి', roman: 'Pettalli', usage: 'older'}]},
+  {key: 'myz', en: 'Mother’s younger sister', note: '',
+   paternal: {te: 'పిన్ని', roman: 'Pinni'},
+   alts: [{te: 'చిన్నమ్మ', roman: 'Chinnamma', usage: 'widely used'}]},
+  {key: 'ff', en: 'Grandfather', note: 'either side',
+   paternal: {te: 'తాత', roman: 'Thaatha'},
+   alts: [{te: 'తాతయ్య', roman: 'Thaathayya', usage: 'affectionate'}]},
+  {key: 'fm', en: 'Father’s mother', note: '',
+   paternal: {te: 'నానమ్మ', roman: 'Nanamma'},
+   alts: [{te: 'నాయనమ్మ', roman: 'Nayanamma', usage: 'widely used'}]},
+  {key: 'mm', en: 'Mother’s mother', note: '',
+   paternal: {te: 'అమ్మమ్మ', roman: 'Ammamma'}, alts: []},
+  {key: 'eb', en: 'Elder brother', note: '',
+   paternal: {te: 'అన్నయ్య', roman: 'Annayya'},
+   alts: [{te: 'అన్న', roman: 'Anna', usage: 'shorter'}]},
+  {key: 'yb', en: 'Younger brother', note: '',
+   paternal: {te: 'తమ్ముడు', roman: 'Thammudu'}, alts: []},
+  {key: 'ez', en: 'Elder sister', note: '',
+   paternal: {te: 'అక్క', roman: 'Akka'},
+   alts: [{te: 'అక్కయ్య', roman: 'Akkayya', usage: 'affectionate'}]},
+  {key: 'yz', en: 'Younger sister', note: '',
+   paternal: {te: 'చెల్లి', roman: 'Chelli'},
+   alts: [{te: 'చెల్లెలు', roman: 'Chellelu', usage: 'fuller'}]}
+];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {side: 'paternal', chosen: {}, added: {}, draft: {}};
+  }
+
+  renderVals() {
+    const st = this.state;
+    const pick = (key, term) => () => {
+      const next = Object.assign({}, this.state.chosen);
+      next[key + ':' + this.state.side] = term;
+      this.setState({chosen: next});
+    };
+    /* Words are discovered over time — an aunt uses one you have never heard, and it belongs
+       in the record the moment you hear it. So the list is data, not a constant. */
+    const setDraft = (key) => (e) => {
+      const next = Object.assign({}, this.state.draft);
+      next[key] = e.target.value;
+      this.setState({draft: next});
+    };
+    const addWord = (key) => () => {
+      const word = ((this.state.draft || {})[key] || '').trim();
+      if (!word) return;
+      const slot = key + ':' + this.state.side;
+      const next = Object.assign({}, this.state.added);
+      next[slot] = (next[slot] || []).concat([{te: word, roman: '', usage: 'your family'}]);
+      const drafts = Object.assign({}, this.state.draft);
+      drafts[key] = '';
+      this.setState({added: next, draft: drafts});
+    };
+
+    return {
+      side: {
+        paternal: () => this.setState({side: 'paternal'}),
+        maternal: () => this.setState({side: 'maternal'}),
+        pCls: st.side === 'paternal' ? 'on' : '', mCls: st.side === 'maternal' ? 'on' : '',
+        pOn: st.side === 'paternal', mOn: st.side === 'maternal',
+        note: st.side === 'maternal'
+          ? 'Words your mother’s people use. Highlighted rows differ from your father’s side.'
+          : 'Words your father’s people use. Switch sides to set the other set.'
+      },
+      rows: ROWS.map(function (r) {
+        const stored = st.chosen[r.key + ':' + st.side];
+        const base = (st.side === 'maternal' && r.maternal) ? r.maternal : r.paternal;
+        const current = stored || base;
+        /* everything that is not the current word is offered as an alternative,
+           including the other side's word */
+        const alts = [];
+        const other = st.side === 'maternal' ? r.paternal : (r.maternal || null);
+        if (other && other.te !== current.te) {
+          alts.push({te: other.te, roman: other.roman,
+                     usage: st.side === 'maternal' ? 'father’s side' : 'mother’s side'});
+        }
+        r.alts.forEach(function (a) { if (a.te !== current.te) alts.push(a); });
+        (st.added[r.key + ':' + st.side] || []).forEach(function (a) {
+          if (a.te !== current.te) alts.push({te: a.te, roman: a.roman, usage: a.usage, added: true});
+        });
+        if (current.te !== r.paternal.te && r.paternal.te !== (other && other.te)) {
+          alts.push({te: r.paternal.te, roman: r.paternal.roman, usage: 'default'});
+        }
+        return {
+          en: r.en, note: r.note,
+          te: current.te, roman: current.roman,
+          cls: (st.side === 'maternal' && r.maternal) ? 'on' : '',
+          draft: (st.draft || {})[r.key] || '',
+          setDraft: setDraft(r.key),
+          add: addWord(r.key),
+          alts: alts.map(function (a) {
+            return {te: a.te, usage: a.usage, addedCls: a.added ? 'added' : '',
+                    pick: pick(r.key, {te: a.te, roman: a.roman})};
+          })
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

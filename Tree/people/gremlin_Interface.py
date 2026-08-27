@@ -1,153 +1,139 @@
+import logging
+
 import Tree.relations.gremlin_Interface as relator
-from Tree import Cardinality, __
-from Tree import TextP
-from Tree import client
-from Tree import g
-from Tree.model.Person import Person
+from Tree import Cardinality, TextP, __, g
+from Tree.Utils.http import ApiError
+
+log = logging.getLogger(__name__)
+
+# Cardinality per property key. The keys are the lowercase spellings the model now emits; the
+# original map keyed on ``Date_of_Birth``/``Date_of_Death`` while the model wrote one casing and
+# the readers expected another.
+#
+# Note on set_ cardinality: Notes.md deliberately chose set_ for birth dates and occupation so a
+# person can carry the same fact in several calendars. A consequence to be aware of is that an
+# edit through /modify/person therefore *appends* rather than replaces. Changing that safely
+# means dropping the existing property values first, which would also discard legitimate
+# multi-calendar entries -- so it needs an explicit product decision rather than a quiet change.
+CARDINALITY = {
+    'Firstname': Cardinality.single,
+    'Lastname': Cardinality.single,
+    'Gender': Cardinality.single,
+    'Alive': Cardinality.single,
+    'Date_of_birth': Cardinality.set_,
+    'Date_of_death': Cardinality.set_,
+    'Occupation': Cardinality.set_,
+}
+
+
+def _apply_properties(traversal, properties):
+    for name, value in properties.items():
+        # The original fallback for an unmapped key called ``property((Cardinality.single, k, v))``
+        # -- one tuple argument instead of three -- which builds a traversal the server rejects.
+        traversal = traversal.property(CARDINALITY.get(name, Cardinality.single), name, value)
+    return traversal
 
 
 def add_person(person, return_id=False):
-    cardinality_Mapper = {
-        'Firstname': Cardinality.single,
-        'Lastname': Cardinality.single,
-        'Gender': Cardinality.single,
-        'Alive': Cardinality.single,
+    properties = person.convert_to_gremlin_node()
+    if not properties:
+        raise ApiError('No person fields supplied.')
 
-        'Date_of_Birth': Cardinality.set_,
-        'Date_of_Death': Cardinality.set_,
-        'Occupation': Cardinality.set_,
+    vertex = _apply_properties(g.addV('Person'), properties).next()
 
-    }
+    # The birth place is written as a property *and*, when it resolves to a Location vertex, as
+    # an edge. The original skipped writing the property whenever the key contained 'Place' and
+    # relied only on the edge, while the read path looked for the property -- so the same fact
+    # was stored one way and read another.
+    try:
+        relator.relate_locations(vertex.id, person)
+    except Exception:
+        log.warning('Could not link %s to its location vertices.', vertex.id, exc_info=True)
 
-    dict = person.convert_to_gremlin_node()
-    vert = g.addV('Person')
-    place = False
-    for item in dict.items():
-        if 'Place' in item[0]:
-            place = True
-        else:
-            try:
-                vert.property(cardinality_Mapper[item[0]], item[0], item[1])
-            except KeyError as e:
-                vert.property((Cardinality.single, item[0], item[1]))
+    return vertex.id if return_id else True
 
-    val = vert.next()
 
-    if place:
-        relator.relate_locations(val.id, person)
+def modify_person(person, vertex_id):
+    """Update a person's properties with a bytecode traversal.
 
-    if return_id:
-        return val.id
-    print('Run everython')
+    This replaces an f-string-built Gremlin script submitted through a raw client, which was a
+    Groovy injection sink independent of the request-body ``eval`` -- any apostrophe in a name
+    also broke the query -- and which created a client per request and never closed it, leaking
+    a four-connection pool and four threads each time. It also hardcoded the server URI past the
+    configured value.
+    """
+    properties = person.convert_to_gremlin_node()
+    if not properties:
+        raise ApiError('No fields to update.')
+    if not g.V(vertex_id).hasNext():
+        raise ApiError('No such person.', status=404)
+
+    _apply_properties(g.V(vertex_id), properties).iterate()
+
+    try:
+        relator.relate_locations(vertex_id, person)
+    except Exception:
+        log.warning('Could not link %s to its location vertices.', vertex_id, exc_info=True)
     return True
 
 
-def modify_person(person: Person, ID):
-    cli = client.Client('ws://localhost:8182/gremlin', 'g')
-    place = False
-    query_string = f"g.V({ID})"
-    for item in person.convert_to_gremlin_node().items():
-        query_string = query_string + f".property('{item[0]}','{item[1]}')"
-        if 'Place' in item[0]:
-            place = True
-    result_set = cli.submit(query_string, request_options={'evaluationTimeout': 5000})
-    future_results = result_set.all()
-    results = future_results.result()
-    if place:
-        relator.relate_locations(ID, person)
-        print('Added Location vertex')
-
-    return True
-
-
-def retrieve_person(id=None, all=False, search_text=None):
+def retrieve_person(id=None, all=False, search_text=None, limit=200):
     if all:
-        return g.V().hasLabel('Person').elementMap('Firstname', 'Date_of_birth', 'Gender').toList()
-    if id is not None:
-        Father = None
-        Mother = None
-        Brother = None
-        Sister = None
-        Children = None
-        Spouse = None
-        val = g.V(id).elementMap().next()
-        if g.V(id).inE('Father_Of').hasNext():
-            Father = g.V(id).in_('Father_Of').elementMap('Firstname', 'Lastname').next()
-        if g.V(id).inE('Mother_Of').hasNext():
-            Mother = g.V(id).in_('Mother_Of').elementMap('Firstname', 'Lastname').next()
-        if g.V(id).inE('Brother_Of').hasNext():
-            Brother = g.V(id).in_('Brother_Of').elementMap('Firstname', 'Lastname').toList()
-        if g.V(id).inE('Sister_Of').hasNext():
-            Sister = g.V(id).in_('Sister_Of').elementMap('Firstname', 'Lastname').toList()
-        if g.V(id).outE('Mother_Of', 'Father_Of').hasNext():
-            Children = g.V(id).out('Mother_Of', 'Father_Of').elementMap('Firstname', 'Lastname').toList()
-        if g.V(id).inE('Wife_Of', 'Husband_Of').hasNext():
-            Spouse = g.V(id).in_('Wife_Of', 'Husband_Of').elementMap('Firstname', 'Lastname').toList()
-        return val, Father, Mother, Brother, Sister, Children, Spouse
-    if search_text is not None:
-        return g.V().where(__.has('Firstname', TextP.containing(search_text.get('Search Text'))).or_()
-                           .has('Lastname', TextP.containing(search_text.get('Search Text')))) \
-            .elementMap('Firstname', 'Lastname', 'Gender').toList()
+        # The original projection asked for a misspelled date key and omitted Lastname.
+        return (
+            g.V().hasLabel('Person')
+            .limit(limit)
+            .elementMap('Firstname', 'Lastname', 'Gender', 'Date_of_birth')
+            .toList()
+        )
 
-## region gremlin script duplicate
-# def son(father_id, mother_id, son_id, adopted=False):
-#
-#     if adopted:
-#         g.V(father_id).addE('Father_Of*').to(g.V(son_id)).next()
-#         g.V(mother_id).addE('Mother_Of*').to(g.V(son_id)).next()
-#         g.V(son_id).addE('Son_Of*').to(g.V(father_id)).next()
-#         g.V(son_id).addE('Son_Of*').to(g.V(mother_id)).next()
-#     else:
-#         g.V(father_id).addE('Father_Of').to(g.V(son_id)).next()
-#         g.V(mother_id).addE('Mother_Of').to(g.V(son_id)).next()
-#         g.V(son_id).addE('Son_Of').to(g.V(father_id)).next()
-#         g.V(son_id).addE('Son_Of').to(g.V(mother_id)).next()
-#     siblings(father_id, mother_id, son_id=son_id)
-#
-#
-# def daughter(father_id, mother_id, daughter_id, adopted=False):
-#     g.V(father_id).addE('Father_Of').to(g.V(daughter_id)).next()
-#     g.V(mother_id).addE('Mother_Of').to(g.V(daughter_id)).next()
-#     if adopted:
-#         g.V(daughter_id).addE('Adopted_Daughter_Of').to(g.V(father_id)).next()
-#         g.V(daughter_id).addE('Adopted_Daughter_Of').to(g.V(mother_id)).next()
-#     else:
-#         g.V(daughter_id).addE('Daughter_Of').to(g.V(father_id)).next()
-#         g.V(daughter_id).addE('Daughter_Of').to(g.V(mother_id)).next()
-#     siblings(father_id, mother_id, daughter_id=daughter_id)
-#
-#
-# def siblings(father_id, mother_id, son_id=None, daughter_id=None):
-#     list_offsprings = []
-#
-#     id = g.V(father_id).out('Husband_Of').next().id
-#
-#     if id == mother_id:  # The people are still married.
-#         list_offsprings = g.V(father_id).in_('Father_Of').valueMap(True).toList()
-#
-#     else:
-#         if son_id is not None:
-#             list_offsprings = g.V(son_id).as_('Me').out('Son_Of').has('Gender', 'Male').as_('Father') \
-#                 .out('Father_Of').where(__.neq('Me')).out('Daughter_Of', 'Son_Of').where(__.neq('Father')).as_(
-#                 'Mother').out('Mother_Of').where(__.neq('Me')).valueMap(True).toList()
-#         if daughter_id is not None:
-#             list_offsprings = g.V(daughter_id).as_('Me').out('Daughter_Of').has('Gender', 'Male').as_('Father') \
-#                 .out('Father_Of').where(__.neq('Me')).out('Daughter_Of', 'Son_Of').where(__.neq('Father')).as_(
-#                 'Mother').out('Mother_Of').where(__.neq('Me')).valueMap(True).toList()
-#
-#     for i in list_offsprings:
-#         if son_id is not None:
-#             if i[T.id] != eval(str(son_id)):
-#                 g.V(son_id).addE('Brother_Of').to(g.V(i[T.id])).next()
-#                 if i['Gender'][0] == 'Male':
-#                     g.V(i[T.id]).addE('Brother_Of').to(g.V(son_id)).next()
-#                 else:
-#                     g.V(i[T.id]).addE('Sister_Of').to(g.V(son_id)).next()
-#         if daughter_id is not None:
-#             if i[T.id] != eval(str(daughter_id)):
-#                 g.V(daughter_id).addE('Sister_Of').to(g.V(i[T.id])).next()
-#                 if i['Gender'][0] == 'Male':
-#                     g.V(i[T.id]).addE('Brother_Of').to(g.V(daughter_id)).next()
-#                 else:
-#                     g.V(i[T.id]).addE('Sister_Of').to(g.V(daughter_id)).next()
-## endregion
+    if id is not None:
+        if not g.V(id).hasNext():
+            # The original called .next() unconditionally, so an unknown id raised
+            # StopIteration and returned a 500 rather than a 404.
+            raise ApiError('No such person.', status=404)
+
+        value = g.V(id).elementMap().next()
+        projection = ('Firstname', 'Lastname')
+
+        # Each of these is ONE round trip. The projection must be appended before the
+        # traversal is executed: calling hasNext() first runs it, and appending elementMap()
+        # afterwards silently returns the already-buffered Vertex objects instead, which then
+        # fail with "'Vertex' object has no attribute 'items'" in the dictionary converter.
+        def _one(step):
+            rows = step.elementMap(*projection).limit(1).toList()
+            return rows[0] if rows else None
+
+        def _many(step):
+            return step.elementMap(*projection).toList() or None
+
+        return (
+            value,
+            _one(g.V(id).in_('Father_Of')),
+            _one(g.V(id).in_('Mother_Of')),
+            _many(g.V(id).in_('Brother_Of')),
+            _many(g.V(id).in_('Sister_Of')),
+            _many(g.V(id).out('Mother_Of', 'Father_Of')),
+            _many(g.V(id).in_('Wife_Of', 'Husband_Of')),
+        )
+
+    if search_text is not None:
+        # The original read search_text['Search Text'] while the route passed the whole body,
+        # whose key is 'Firstname' -- so a name search sent TextP.containing(None) to the server.
+        needle = search_text
+        if isinstance(search_text, dict):
+            needle = search_text.get('Search Text') or search_text.get('Firstname')
+        if not needle:
+            raise ApiError('A non-empty search term is required.')
+        return (
+            g.V().hasLabel('Person')
+            .where(
+                __.has('Firstname', TextP.containing(needle)).or_()
+                .has('Lastname', TextP.containing(needle))
+            )
+            .limit(limit)
+            .elementMap('Firstname', 'Lastname', 'Gender')
+            .toList()
+        )
+
+    raise ApiError('One of id, all or search_text is required.')

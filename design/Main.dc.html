@@ -1,0 +1,1442 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+Telugu:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --paper:#EFF1EA; --surface:#FAFBF7; --surface-2:#E7EBDE; --sunk:#E2E7D6;
+      --ink:#1A1E15; --ink-2:#3D4636; --muted:#6B7563; --rule:#D3D9C6; --rule-soft:#E3E7D8;
+      --olive:#3F6D14; --olive-soft:#E4EDD4; --olive-line:#7FA352;
+      --brown:#8F3F0A; --brown-soft:#F4E3D5;
+      --blue:#1261BB; --blue-soft:#DCE8F7;
+      --amber:#A45C0E; --amber-soft:#F9E8D4;
+      --serif:"Faustina","Iowan Old Style",Georgia,serif;
+      --sans:"Source Sans 3","Helvetica Neue",Arial,"Noto Serif Telugu",sans-serif;
+      --telugu:"Noto Serif Telugu","Faustina",serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:14px; line-height:1.45;
+           -webkit-font-smoothing:antialiased; }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { color:#0E4E96; text-decoration:underline; }
+    button { font-family:inherit; font-size:inherit; color:inherit; cursor:pointer; }
+
+    .app { display:grid; grid-template-columns:236px 1fr 332px; grid-template-rows:auto 1fr;
+           height:900px; }
+
+    /* ── top bar ───────────────────────────────────────── */
+    .top { grid-column:1/-1; display:flex; align-items:center; gap:20px;
+           padding:0 20px; height:60px; background:var(--surface);
+           border-bottom:1px solid var(--rule); }
+    .brand { display:flex; align-items:center; gap:9px; font-family:var(--serif);
+             font-size:18px; font-weight:600; letter-spacing:-.01em; white-space:nowrap; }
+    .search { flex:1; max-width:420px; display:flex; align-items:center; gap:8px;
+              background:var(--paper); border:1px solid var(--rule);
+              border-radius:3px; padding:0 10px; height:34px; color:var(--muted); }
+    .search input { flex:1; border:none; background:none; font-family:inherit; font-size:13px;
+                    color:var(--ink); height:32px; }
+    .search input:focus { outline:none; }
+    .search input::placeholder { color:var(--muted); }
+    .seg { display:flex; border:1px solid var(--rule); border-radius:3px; overflow:hidden;
+           background:var(--paper); }
+    .seg button { border:none; background:none; padding:0 11px; height:32px; font-size:12px;
+                  font-weight:600; color:var(--muted); letter-spacing:.02em; }
+    .seg button + button { border-left:1px solid var(--rule); }
+    .seg button.on { background:var(--blue); color:#fff; }
+    .seg button.te { font-family:var(--telugu); font-size:13px; }
+    .who { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted);
+           margin-left:auto; white-space:nowrap; }
+    .avatar { width:26px; height:26px; border-radius:50%; background:var(--olive-soft);
+              border:1px solid var(--olive-line); display:grid; place-items:center;
+              font-family:var(--serif); font-size:12px; font-weight:600; color:var(--olive); }
+
+    /* ── rails ─────────────────────────────────────────── */
+    .rail { background:var(--surface); overflow:hidden; }
+    .rail-l { border-right:1px solid var(--rule); }
+    .rail-r { border-left:1px solid var(--rule); }
+    .rail-in { padding:18px 18px 24px; }
+    .lbl { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+           color:var(--muted); margin:0 0 9px; }
+    .rail-sec + .rail-sec { margin-top:22px; padding-top:20px; border-top:1px solid var(--rule-soft); }
+
+    .rootcard { background:var(--olive-soft); border:1px solid var(--olive-line);
+                border-radius:4px; padding:11px 12px; }
+    .rootcard .nm { font-family:var(--serif); font-weight:600; font-size:15px; line-height:1.2; }
+    .rootcard .te { font-family:var(--telugu); font-size:12px; color:var(--olive); margin-top:2px; }
+    .rootcard .sub { font-size:11px; color:var(--ink-2); margin-top:5px; }
+
+    .slider { display:flex; align-items:center; gap:9px; }
+    .track { flex:1; height:3px; background:var(--sunk); border-radius:2px; position:relative; }
+    .track i { position:absolute; left:0; top:0; bottom:0; background:var(--olive-line);
+               border-radius:2px; }
+    .knob { position:absolute; top:50%; width:13px; height:13px; margin:-6.5px 0 0 -6.5px;
+            background:var(--surface); border:2px solid var(--olive); border-radius:50%; }
+    .track-n { font-family:var(--sans); font-variant-numeric:tabular-nums; font-size:12px;
+               font-weight:600; color:var(--ink-2); min-width:14px; text-align:right; }
+    input[type=range] { flex:1; accent-color:var(--olive); height:20px; }
+
+    .check { display:flex; align-items:flex-start; gap:9px; padding:5px 0; }
+    .box { width:15px; height:15px; flex:none; margin-top:1px; border-radius:2px;
+           border:1.5px solid var(--rule); background:var(--surface); display:grid;
+           place-items:center; }
+    .box.on { background:var(--blue); border-color:var(--blue); }
+    .check-t { font-size:12.5px; color:var(--ink-2); }
+    .check-h { font-size:11px; color:var(--muted); margin-top:1px; }
+
+    .vseg { width:100%; }
+    .vseg button { flex:1; }
+    .vhint { margin-top:8px; font-size:11.5px; color:var(--muted); line-height:1.5; }
+    /* Equivalent words for the same relation. Shown as content, because which one is
+       "right" depends on who is speaking, not on the data. */
+    .alsorow { display:flex; flex-wrap:wrap; align-items:baseline; gap:5px 10px;
+               padding:9px 12px; border-top:1px solid var(--rule-soft); }
+    .al-l { font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+            color:var(--muted); width:100%; line-height:1.4; }
+    .al-v { display:inline-flex; align-items:baseline; gap:6px; padding:3px 8px;
+            border:1px solid var(--rule); border-radius:12px; background:var(--paper); }
+    .al-v:hover { border-color:var(--brown); background:var(--brown-soft); }
+    .al-v.added { border-style:dashed; border-color:var(--olive-line); }
+    .al-te { font-family:var(--telugu); font-size:13px; color:var(--ink-2); }
+    .al-u { font-size:10.5px; color:var(--muted); }
+    .al-add { padding:3px 9px; border:1px dashed var(--blue); border-radius:12px;
+              background:none; color:var(--blue); font-size:11.5px; font-weight:600; }
+    .al-add:hover { background:var(--blue-soft); }
+    /* A word pinned to one person, overriding the vocabulary for them alone. */
+    .pinrow { display:flex; align-items:center; gap:7px; padding:8px 12px;
+              border-top:1px solid var(--rule-soft); background:var(--brown-soft);
+              font-size:11.5px; font-weight:600; color:var(--brown); }
+    .pinrow button { margin-left:auto; border:none; background:none; color:var(--brown);
+                     font-size:11.5px; font-weight:700; text-decoration:underline; }
+    .addform { margin-top:10px; border:1px solid var(--blue); border-left-width:3px;
+               border-radius:0 4px 4px 0; background:var(--surface); padding:11px 13px; }
+    .af-h { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+            color:var(--blue); margin-bottom:8px; }
+    .af-i { display:block; width:100%; height:32px; border:none;
+            border-bottom:1px solid #9AA48D; background:transparent; font-family:inherit;
+            font-size:13.5px; color:var(--ink); margin-bottom:8px; padding:0 2px; }
+    .af-i.is-te { font-family:var(--telugu); font-size:16px; }
+    .af-i:focus { outline:none; border-bottom:2px solid var(--blue); }
+    .af-b { display:flex; gap:8px; }
+    .af-save { height:30px; padding:0 14px; border:1px solid var(--blue); border-radius:3px;
+               background:var(--blue); color:#fff; font-size:12.5px; font-weight:600; }
+    .af-cancel { height:30px; padding:0 12px; border:1px solid var(--rule); border-radius:3px;
+                 background:var(--surface); color:var(--muted); font-size:12.5px; font-weight:600; }
+    .af-n { margin:8px 0 0; font-size:11px; color:var(--muted); line-height:1.5; }
+    .sampled { font-size:11.5px; color:var(--ink-2); line-height:1.55; background:var(--sunk);
+               border-radius:3px; padding:9px 10px; }
+    .key { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-2);
+           padding:3px 0; }
+    .key i { width:20px; flex:none; height:0; border-top:2px solid var(--olive-line); }
+    .key i.adopt { border-top:2px dashed var(--brown); }
+    .key i.union { border-top:2px solid var(--rule); }
+    .dotk { width:8px; height:8px; border-radius:50%; background:var(--amber); flex:none; }
+    .dotn { width:7px; height:7px; border-radius:50%; border:1.5px solid var(--muted);
+            opacity:.65; flex:none; }
+    .unres { width:20px; flex:none; text-align:center; font-family:var(--telugu);
+             font-size:10px; color:var(--blue); border:1px dashed var(--blue); border-radius:2px; }
+    .linkmark { width:20px; flex:none; text-align:center; color:var(--olive); font-weight:700; }
+
+    /* ── tree canvas ───────────────────────────────────── */
+    .canvas { position:relative; overflow:auto; background:var(--paper);
+      background-image:radial-gradient(var(--rule-soft) 1px, transparent 1px);
+      background-size:22px 22px; }
+    .canvas-in { padding:34px 40px 60px; min-width:max-content; }
+    .genrow { display:flex; align-items:flex-start; justify-content:center; }
+    .genrow.is-first { margin-bottom:0; }
+
+    .branchrow { display:flex; align-items:flex-start; justify-content:center; gap:30px;
+                 position:relative; }
+    .branchrow.hastop.multi::before { content:""; position:absolute; top:0; left:14%; right:14%;
+                         border-top:2px solid var(--olive-line); }
+    .branch { display:flex; flex-direction:column; align-items:center; padding-top:26px;
+              position:relative; }
+    .branchrow.hastop .branch::before { content:""; position:absolute; top:0; left:50%;
+                      height:26px; border-left:2px solid var(--olive-line); }
+
+    .drop { height:26px; width:0; border-left:2px solid var(--olive-line); }
+    .drop.dim { border-color:var(--rule); }
+
+    /* Equal-height boxes: a row of brothers and sisters reads as one set rather than as
+       four differently-sized cards, and a long name no longer makes its card taller. */
+    .kidrow { display:flex; align-items:stretch; gap:14px; position:relative;
+              padding-top:24px; }
+    .kidrow.multi::before { content:""; position:absolute; top:0; left:12%; right:12%;
+                            border-top:2px solid var(--olive-line); }
+    .kid { display:flex; flex-direction:column; align-items:stretch; position:relative;
+           padding-top:0; }
+    .kid > .card { flex:1; }
+    .kid.tick::before { content:""; position:absolute; top:-24px; left:50%; height:24px;
+                        border-left:2px solid var(--olive-line); }
+
+    /* ── couple + person cards ─────────────────────────── */
+    .couple { display:flex; align-items:stretch; }
+    .couple > .card { align-self:stretch; }
+    .knot { width:26px; flex:none; align-self:center; height:0;
+            border-top:2px solid var(--rule); }
+
+    /* A column, so the kinship chip can be pushed to the bottom with margin-top:auto and
+       therefore sits on a common baseline across every card in a row. */
+    .card { position:relative; width:172px; background:var(--surface);
+            border:1px solid var(--rule); border-radius:4px; padding:9px 10px 10px;
+            text-align:left; display:flex; flex-direction:column; align-items:flex-start;
+            transition:box-shadow .12s, border-color .12s; }
+    .card:hover { border-color:var(--olive-line); box-shadow:0 1px 4px rgba(26,30,21,.09); }
+    .card.sel { border-color:var(--blue); box-shadow:0 0 0 2px var(--blue-soft); }
+    .card.sel::after { content:""; position:absolute; left:-1px; top:6px; bottom:6px; width:3px;
+                       background:var(--blue); border-radius:2px; }
+    .card.focus { border-color:var(--olive); box-shadow:0 0 0 2px var(--olive-soft);
+                  background:var(--surface); }
+    .card.adopt { border-style:dashed; border-color:var(--brown); }
+    .card.compact { width:150px; padding:7px 9px 8px; }
+
+    .card-top { display:flex; align-items:baseline; gap:6px; }
+    .sym { width:8px; height:8px; flex:none; margin-top:5px;
+           border:1.5px solid var(--muted); }
+    .sym.f { border-radius:50%; }
+    .nm { display:block; font-family:var(--serif); font-size:14.5px; font-weight:600;
+          line-height:1.2; letter-spacing:-.005em; text-wrap:balance; }
+    .te { display:block; font-family:var(--telugu); font-size:12.5px; color:var(--ink-2);
+          line-height:1.35; margin-top:1px; }
+    .yrs { display:block; font-size:11.5px; color:var(--muted);
+           font-variant-numeric:tabular-nums; margin:3px 0 8px; letter-spacing:.01em; }
+    /* Uppercase micro-type is for short fixed labels (EN, BY BIRTH), not for a
+       variable-length content string: "FATHER'S YOUNGER BROTHER'S WIFE" is ~40% wider than the
+       same words in sentence case and wrapped to three lines on a card. Sentence case at 11px
+       fits most labels on one line. The chip is then its natural size — the CARD absorbs the
+       difference, because a row of siblings is laid out as equal-height boxes (below). */
+    .kin { display:inline-flex; align-items:center; margin-top:auto; padding:3px 7px;
+           font-size:11px; font-weight:600; line-height:1.3; color:var(--olive);
+           background:var(--olive-soft); border-radius:3px; }
+    .kin.tel { font-family:var(--telugu); font-size:12.5px; font-weight:500; }
+    /* A label Telugu cannot settle from the record: shown as the pair, marked as open. */
+    .kin.unresolved { background:var(--blue-soft); color:var(--blue);
+                      border:1px dashed var(--blue); padding:2px 6px; }
+    .chip-adopt { position:absolute; top:-9px; right:8px; display:inline-flex;
+                  align-items:center; height:16px; padding:0 5px; font-size:9.5px;
+                  font-weight:700; line-height:1; letter-spacing:.06em; text-transform:uppercase;
+                  white-space:nowrap; color:var(--brown); background:var(--brown-soft);
+                  border:1px solid var(--brown); border-radius:3px; }
+    .flagdot { position:absolute; top:8px; right:8px; width:8px; height:8px; border-radius:50%;
+               background:var(--amber); }
+    .notedot { position:absolute; top:8px; right:8px; width:7px; height:7px; border-radius:50%;
+               border:1.5px solid var(--muted); opacity:.65; }
+    /* more than one route to the same person: ordinary here, so it sits in the card body
+       in the accent colour rather than shouting from the corner */
+    .links { display:block; margin-top:6px; font-size:11px; font-weight:600; color:var(--olive);
+             letter-spacing:.01em; }
+    .links::before { content:"⁂"; margin-right:4px; opacity:.75; }
+    .rootpin { position:absolute; top:-9px; left:8px; display:inline-flex; align-items:center;
+               height:16px; padding:0 6px; font-size:9.5px; font-weight:700; line-height:1;
+               letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; color:#fff;
+               background:var(--olive); border-radius:3px; }
+
+    .expand { margin-top:12px; display:inline-flex; align-items:center; gap:5px;
+              background:var(--surface); border:1px dashed var(--olive-line);
+              border-radius:12px; padding:3px 10px; font-size:11px; font-weight:600;
+              color:var(--olive); }
+    .expand:hover { background:var(--olive-soft); }
+
+    /* ── right rail: kinship panel ─────────────────────── */
+    .kinhead { font-family:var(--serif); font-size:19px; font-weight:600; line-height:1.15;
+               letter-spacing:-.01em; }
+    .kinhead-te { font-family:var(--telugu); font-size:15px; color:var(--ink-2); margin-top:2px; }
+    .kinmeta { font-size:11.5px; color:var(--muted); margin-top:5px;
+               font-variant-numeric:tabular-nums; }
+
+    .kinbox { margin-top:14px; border:1px solid var(--rule); border-radius:4px;
+              overflow:hidden; }
+    .kinrow { display:grid; grid-template-columns:52px 1fr; align-items:baseline; gap:10px;
+              padding:10px 12px; }
+    .kinrow + .kinrow { border-top:1px solid var(--rule-soft); }
+    .kinrow .tag { font-size:9.5px; font-weight:700; letter-spacing:.08em;
+                   text-transform:uppercase; color:var(--muted); }
+    .kinrow .val { font-family:var(--serif); font-size:16px; font-weight:600; line-height:1.2; }
+    .kinrow .val.tel { font-family:var(--telugu); font-weight:500; }
+    .kinrow .glossy { font-size:11px; color:var(--muted); margin-top:2px; }
+    .kinrow.hl { background:var(--olive-soft); }
+
+    .kinbox + .kinbox { margin-top:10px; }
+    .kinvia { padding:6px 12px; background:var(--surface-2); border-bottom:1px solid var(--rule);
+              font-size:10px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+              color:var(--ink-2); }
+    /* Two routes to the same person are two answers of the same kind, so the boxes hold a
+       common rhythm rather than shrinking to whichever explanation happens to be shorter. */
+    .whyrow { padding:9px 12px; border-top:1px solid var(--rule-soft); background:var(--sunk);
+              font-size:12px; color:var(--ink-2); line-height:1.5;
+              min-height:calc(2 * 1.5em + 18px); display:flex; align-items:center; }
+    /* Two routes to the same person is ordinary here. This states that plainly, in the
+       accent colour, rather than in the colour reserved for things that are wrong. */
+    .multinote { margin-top:10px; border-left:3px solid var(--olive-line);
+                 background:var(--olive-soft); border-radius:0 3px 3px 0; padding:10px 12px;
+                 font-size:12.5px; color:#2B4A0E; line-height:1.55; }
+
+    .facts { margin-top:18px; }
+    .fact { display:grid; grid-template-columns:74px 1fr; gap:10px; padding:5px 0;
+            font-size:12.5px; align-items:baseline; }
+    .fact .k { font-size:11px; color:var(--muted); }
+    .fact .v { color:var(--ink-2); }
+    .fact .v.approx { color:var(--muted); font-style:italic; }
+
+    .rel { display:flex; align-items:baseline; gap:8px; padding:5px 0; font-size:12.5px; }
+    .rel .r { font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+              color:var(--muted); min-width:66px; }
+
+    .warn { margin-top:16px; border-left:3px solid var(--amber); background:var(--amber-soft);
+            padding:10px 12px; font-size:12.5px; color:#5E360A; line-height:1.55; }
+    .warn b { display:block; font-size:10.5px; font-weight:700; letter-spacing:.07em;
+              text-transform:uppercase; margin-bottom:3px; }
+
+    /* The app asks for exactly the one fact it needs, at the moment it needs it. Answering
+       re-labels every affected relationship in the tree immediately. */
+    .askorder { margin-top:10px; border:1px solid var(--blue); border-left-width:3px;
+                border-radius:0 4px 4px 0; background:var(--blue-soft); padding:11px 13px; }
+    .ao-h { display:flex; align-items:center; gap:7px; font-size:11px; font-weight:700;
+            letter-spacing:.07em; text-transform:uppercase; color:var(--blue); }
+    .ao-p { margin:6px 0 0; font-size:12px; line-height:1.5; color:#123B6B; }
+    .ao-btns { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+    .ao-btns button { min-height:32px; padding:0 10px; border:1px solid var(--blue);
+                      border-radius:3px; background:var(--surface); color:var(--blue);
+                      font-size:12.5px; font-weight:600; text-align:left; }
+    .ao-btns button:hover { background:#CFE1F5; }
+    .ao-note { margin:9px 0 0; font-size:11.5px; line-height:1.5; color:#3C5C82; }
+    .quietnote { margin-top:14px; padding:9px 11px; background:var(--sunk); border-radius:3px;
+                 font-size:12px; color:var(--muted); line-height:1.5; }
+    .acts { display:flex; gap:8px; margin-top:18px; }
+    .btn { flex:1; height:34px; border-radius:3px; border:1px solid var(--blue);
+           background:var(--blue); color:#fff; font-size:12.5px; font-weight:600;
+           display:grid; place-items:center; }
+    .btn:hover { background:#0E4E96; }
+    .btn.ghost { background:var(--surface); color:var(--blue); }
+    .btn.ghost:hover { background:var(--blue-soft); }
+  </style>
+</helmet>
+
+<div class="app">
+
+  <!-- ══ top bar ══ -->
+  <div class="top">
+    <div class="brand">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 21V11" stroke="#3F6D14" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M12 11C12 6.5 8.5 3.5 4.5 3.5c0 4.5 3 7.5 7.5 7.5Z" stroke="#3F6D14" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M12 14c0-3.6 2.8-6 6-6 0 3.6-2.4 6-6 6Z" stroke="#7FA352" stroke-width="1.7" stroke-linejoin="round"/>
+      </svg>
+      Family Tree
+    </div>
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5" stroke="#6B7563" stroke-width="1.8"/>
+        <path d="M16 16l4.5 4.5" stroke="#6B7563" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <input type="search" placeholder="Search names in either script — Varma, వర్మ" aria-label="Search people">
+    </div>
+    <div class="seg">
+      <button class="{{lang.enCls}}" aria-pressed="{{lang.enOn}}" onClick="{{lang.setEn}}">English</button>
+      <button class="te {{lang.teCls}}" aria-pressed="{{lang.teOn}}" onClick="{{lang.setTe}}">తెలుగు</button>
+      <button class="{{lang.bothCls}}" aria-pressed="{{lang.bothOn}}" onClick="{{lang.setBoth}}">Both</button>
+    </div>
+    <div class="who">
+      <span>{{counts.people}} people &middot; {{counts.gens}} generations</span>
+      <div class="avatar">KS</div>
+    </div>
+  </div>
+
+  <!-- ══ left rail ══ -->
+  <div class="rail rail-l">
+    <div class="rail-in">
+      <div class="rail-sec">
+        <p class="lbl">Kinship measured from</p>
+        <div class="rootcard">
+          <div class="nm">{{root.name}}</div>
+          <div class="te">{{root.te}}</div>
+          <div class="sub">{{root.years}} &middot; {{root.place}}</div>
+        </div>
+      </div>
+
+      <div class="rail-sec">
+        <p class="lbl">Family vocabulary</p>
+        <div class="seg vseg">
+          <button class="{{vocab.pCls}}" aria-pressed="{{vocab.pOn}}" onClick="{{vocab.paternal}}">Father&rsquo;s side</button>
+          <button class="{{vocab.mCls}}" aria-pressed="{{vocab.mOn}}" onClick="{{vocab.maternal}}">Mother&rsquo;s side</button>
+        </div>
+        <div class="vhint">{{vocab.hint}}</div>
+      </div>
+
+      <div class="rail-sec">
+        <p class="lbl">Generations shown</p>
+        <div class="slider">
+          <span class="track-n">2</span>
+          <input type="range" min="2" max="4" value="3" aria-label="Generations shown">
+          <span class="track-n">4</span>
+        </div>
+      </div>
+
+      <div class="rail-sec">
+        <p class="lbl">Show</p>
+        <button class="check" aria-pressed="{{toggles.adoptOn}}" onClick="{{toggles.adopt}}" style="border:none;background:none;padding:5px 0;width:100%;text-align:left">
+          <span class="box {{toggles.adoptCls}}">
+            <sc-if value="{{toggles.adoptOn}}" hint-placeholder-val="{{true}}">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6.2l2.6 2.6L10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </sc-if>
+          </span>
+          <span>
+            <span class="check-t">Adoptive links</span>
+            <span class="check-h">Dashed, in brown</span>
+          </span>
+        </button>
+        <button class="check" aria-pressed="{{toggles.flagsOn}}" onClick="{{toggles.flags}}" style="border:none;background:none;padding:5px 0;width:100%;text-align:left">
+          <span class="box {{toggles.flagsCls}}">
+            <sc-if value="{{toggles.flagsOn}}" hint-placeholder-val="{{true}}">
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6.2l2.6 2.6L10 3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </sc-if>
+          </span>
+          <span>
+            <span class="check-t">Record markers</span>
+            <span class="check-h">{{counts.flags}}</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="rail-sec">
+        <p class="lbl">About this data</p>
+        <div class="sampled">Birth years shown here are <strong>sample values</strong>. The
+          project&rsquo;s seed graph records the same placeholder date, 1990-01-01, for all 29
+          people, so no birth order is actually known &mdash; which is why several Telugu
+          labels below are unresolved.</div>
+      </div>
+
+      <div class="rail-sec">
+        <p class="lbl">Key</p>
+        <div class="key"><i></i> Descent</div>
+        <div class="key"><i class="adopt"></i> Adoptive descent</div>
+        <div class="key"><i class="union"></i> Union</div>
+        <div class="key" style="margin-top:8px"><span class="linkmark">⁂</span> Related more than one way</div>
+        <div class="key"><span class="dotk"></span> Contradiction to settle</div>
+        <div class="key"><span class="dotn"></span> Record incomplete</div>
+        <div class="key"><span class="unres">అ / అ</span> Telugu label needs a fact</div>
+        <div class="key" style="margin-top:8px">
+          <span class="sym" style="margin-top:0"></span> Male
+          <span class="sym f" style="margin-top:0;margin-left:10px"></span> Female
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ tree canvas ══ -->
+  <div class="canvas">
+    <div class="canvas-in">
+
+      <!-- grandparent generation -->
+      <sc-if value="{{hasTop}}" hint-placeholder-val="{{true}}">
+      <div class="genrow is-first">
+        <div class="couple">
+          <button class="card {{top.aCls}}" onClick="{{top.aPick}}">
+            <sc-if value="{{top.aconflict}}" hint-placeholder-val="{{false}}">
+              <span class="flagdot" role="img" aria-label="Contradiction to review"></span>
+            </sc-if>
+            <sc-if value="{{top.anote}}" hint-placeholder-val="{{false}}">
+              <span class="notedot" role="img" aria-label="Incomplete record"></span>
+            </sc-if>
+            <span class="card-top"><span class="sym {{top.aSym}}"></span>
+              <span><span class="nm">{{top.aName}}</span>
+              <span class="te">{{top.aTe}}</span></span></span>
+            <span class="yrs">{{top.aYears}}</span>
+            <span class="kin {{lang.chipCls}} {{top.aKinCls}}">{{top.aKin}}</span>
+            <sc-if value="{{top.amulti}}" hint-placeholder-val="{{false}}">
+              <span class="links">{{top.alinks}}</span>
+            </sc-if>
+          </button>
+          <sc-if value="{{top.hasB}}" hint-placeholder-val="{{true}}">
+            <span class="knot"></span>
+            <button class="card {{top.bCls}}" onClick="{{top.bPick}}">
+              <sc-if value="{{top.bconflict}}" hint-placeholder-val="{{false}}">
+                <span class="flagdot" role="img" aria-label="Contradiction to review"></span>
+              </sc-if>
+              <sc-if value="{{top.bnote}}" hint-placeholder-val="{{false}}">
+                <span class="notedot" role="img" aria-label="Incomplete record"></span>
+              </sc-if>
+              <span class="card-top"><span class="sym {{top.bSym}}"></span>
+                <span><span class="nm">{{top.bName}}</span>
+                <span class="te">{{top.bTe}}</span></span></span>
+              <span class="yrs">{{top.bYears}}</div>
+              <span class="kin {{lang.chipCls}} {{top.bKinCls}}">{{top.bKin}}</span>
+              <sc-if value="{{top.bmulti}}" hint-placeholder-val="{{false}}">
+                <span class="links">{{top.blinks}}</span>
+              </sc-if>
+            </button>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- parent generation: father + his siblings, each its own branch -->
+      <div class="branchrow {{rowCls}}">
+        <sc-for list="{{branches}}" as="br" hint-placeholder-count="5">
+          <div class="branch">
+            <div class="couple">
+              <button class="card {{br.aSizeCls}} {{br.aCls}}" onClick="{{br.aPick}}">
+                <sc-if value="{{br.aIsRoot}}" hint-placeholder-val="{{false}}">
+                  <span class="rootpin">You</span>
+                </sc-if>
+                <sc-if value="{{br.aAdopted}}" hint-placeholder-val="{{false}}">
+                  <span class="chip-adopt">Adopted</span>
+                </sc-if>
+                <sc-if value="{{br.aconflict}}" hint-placeholder-val="{{false}}">
+                  <span class="flagdot" role="img" aria-label="Contradiction to review"></span>
+                </sc-if>
+                <sc-if value="{{br.anote}}" hint-placeholder-val="{{false}}">
+                  <span class="notedot" role="img" aria-label="Incomplete record"></span>
+                </sc-if>
+                <span class="card-top"><span class="sym {{br.aSym}}"></span>
+                  <span><span class="nm">{{br.aName}}</span>
+                  <span class="te">{{br.aTe}}</span></span></span>
+                <span class="yrs">{{br.aYears}}</div>
+                <span class="kin {{lang.chipCls}} {{br.aKinCls}}">{{br.aKin}}</span>
+                <sc-if value="{{br.amulti}}" hint-placeholder-val="{{false}}">
+                  <span class="links">{{br.alinks}}</span>
+                </sc-if>
+              </button>
+              <sc-if value="{{br.showSpouse}}" hint-placeholder-val="{{true}}">
+                <span class="knot"></span>
+                <button class="card compact {{br.bCls}}" onClick="{{br.bPick}}">
+                  <sc-if value="{{br.bconflict}}" hint-placeholder-val="{{false}}">
+                    <span class="flagdot" role="img" aria-label="Contradiction to review"></span>
+                  </sc-if>
+                  <sc-if value="{{br.bnote}}" hint-placeholder-val="{{false}}">
+                    <span class="notedot" role="img" aria-label="Incomplete record"></span>
+                  </sc-if>
+                  <span class="card-top"><span class="sym {{br.bSym}}"></span>
+                    <span><span class="nm">{{br.bName}}</span>
+                    <span class="te">{{br.bTe}}</span></span></span>
+                  <span class="yrs">{{br.bYears}}</div>
+                  <span class="kin {{lang.chipCls}} {{br.bKinCls}}">{{br.bKin}}</span>
+                  <sc-if value="{{br.bmulti}}" hint-placeholder-val="{{false}}">
+                    <span class="links">{{br.blinks}}</span>
+                  </sc-if>
+                </button>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{br.open}}" hint-placeholder-val="{{true}}">
+              <div class="kidrow {{br.multiCls}}">
+                <sc-for list="{{br.kids}}" as="k" hint-placeholder-count="2">
+                  <div class="kid {{br.tickCls}}">
+                    <button class="card compact {{k.cls}}" onClick="{{k.pick}}">
+                      <sc-if value="{{k.isRoot}}" hint-placeholder-val="{{false}}">
+                        <span class="rootpin">You</span>
+                      </sc-if>
+                      <sc-if value="{{k.adopted}}" hint-placeholder-val="{{false}}">
+                        <span class="chip-adopt">Adopted</span>
+                      </sc-if>
+                      <sc-if value="{{k.conflict}}" hint-placeholder-val="{{false}}">
+                        <span class="flagdot" role="img" aria-label="Contradiction to review"></span>
+                      </sc-if>
+                      <sc-if value="{{k.note}}" hint-placeholder-val="{{false}}">
+                        <span class="notedot" role="img" aria-label="Incomplete record"></span>
+                      </sc-if>
+                      <span class="card-top"><span class="sym {{k.sym}}"></span>
+                        <span><span class="nm">{{k.name}}</span>
+                        <span class="te">{{k.te}}</span></span></span>
+                      <span class="yrs">{{k.years}}</div>
+                      <span class="kin {{lang.chipCls}} {{k.kinCls}}">{{k.kin}}</span>
+                      <sc-if value="{{k.multi}}" hint-placeholder-val="{{false}}">
+                        <span class="links">{{k.links}}</span>
+                      </sc-if>
+                    </button>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{br.closed}}" hint-placeholder-val="{{false}}">
+              <button class="expand" onClick="{{br.toggle}}">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="#3F6D14" stroke-width="1.8" stroke-linecap="round"/></svg>
+                {{br.expandLabel}}
+              </button>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ right rail ══ -->
+  <div class="rail rail-r">
+    <div class="rail-in">
+      <p class="lbl">Selected</p>
+      <div class="kinhead">{{sel.name}}</div>
+      <div class="kinhead-te">{{sel.te}}</div>
+      <div class="kinmeta">{{sel.meta}}</div>
+
+      <p class="lbl" style="margin-top:16px">{{sel.linksHeading}}</p>
+      <sc-for list="{{sel.links}}" as="r" hint-placeholder-count="2">
+        <div class="kinbox">
+          <sc-if value="{{r.hasVia}}" hint-placeholder-val="{{false}}">
+            <div class="kinvia">{{r.via}}</div>
+          </sc-if>
+          <div class="kinrow">
+            <span class="tag">EN</span>
+            <span><span class="val">{{r.en}}</span></span>
+          </div>
+          <div class="kinrow hl">
+            <span class="tag">తెలుగు</span>
+            <span><span class="val tel">{{r.te}}</span>
+            <span class="glossy">{{r.gloss}}</span></span>
+          </div>
+          <sc-if value="{{r.pinned}}" hint-placeholder-val="{{false}}">
+            <div class="pinrow">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex:none">
+                <path d="M9 3h6l-1 6 4 4v2H6v-2l4-4-1-6Z" stroke="#8F3F0A" stroke-width="1.7" stroke-linejoin="round"/>
+                <path d="M12 15v6" stroke="#8F3F0A" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+              <span>Always used for {{sel.firstName}}</span>
+              <button onClick="{{r.unpin}}">Undo</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{r.hasAlso}}" hint-placeholder-val="{{true}}">
+            <div class="alsorow">
+              <span class="al-l">Also called &mdash; tap one to always use it for {{sel.firstName}}</span>
+              <sc-for list="{{r.also}}" as="v" hint-placeholder-count="2">
+                <button class="al-v {{v.addedCls}}" onClick="{{v.pin}}">
+                  <span class="al-te">{{v.te}}</span><span class="al-u">{{v.usage}}</span>
+                </button>
+              </sc-for>
+              <button class="al-add" onClick="{{sel.openAdd}}">+ add a word</button>
+            </div>
+          </sc-if>
+          <div class="whyrow">{{r.why}}</div>
+        </div>
+      </sc-for>
+      <sc-if value="{{sel.addOpen}}" hint-placeholder-val="{{false}}">
+        <div class="addform">
+          <div class="af-h">Add a word your family uses</div>
+          <input class="af-i is-te" value="{{sel.draftTe}}" onInput="{{sel.setDraftTe}}"
+                 placeholder="Word in Telugu" aria-label="Word in Telugu">
+          <input class="af-i" value="{{sel.draftUse}}" onInput="{{sel.setDraftUse}}"
+                 placeholder="Who says it — optional" aria-label="Who says it">
+          <div class="af-b">
+            <button class="af-save" onClick="{{sel.saveWord}}">Add</button>
+            <button class="af-cancel" onClick="{{sel.cancelAdd}}">Cancel</button>
+          </div>
+          <p class="af-n">It joins the equivalents for this relation everywhere, and can then be
+            pinned to one person.</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{sel.needsOrder}}" hint-placeholder-val="{{true}}">
+        <div class="askorder">
+          <div class="ao-h">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="flex:none">
+              <circle cx="12" cy="12" r="9" stroke="#1261BB" stroke-width="1.7"/>
+              <path d="M9.6 9.4a2.5 2.5 0 114.4 1.7c-.9.9-2 1.3-2 2.6M12 17v.1"
+                    stroke="#1261BB" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+            Which of the two is older?
+          </div>
+          <p class="ao-p">{{sel.orderQuestion}}</p>
+          <div class="ao-btns">
+            <button onClick="{{sel.orderA}}">{{sel.orderAName}}</button>
+            <button onClick="{{sel.orderB}}">{{sel.orderBName}}</button>
+          </div>
+          <p class="ao-note">English needs no answer here &mdash; it says &ldquo;brother&rdquo;
+            either way. This is the asymmetry the record has to carry.</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{sel.multi}}" hint-placeholder-val="{{false}}">
+        <div class="multinote">{{sel.multiNote}}</div>
+      </sc-if>
+
+      <div class="facts">
+        <p class="lbl" style="margin-top:16px">Record</p>
+        <div class="fact"><span class="k">Born</span><span class="v {{sel.bornCls}}">{{sel.born}}</span></div>
+        <div class="fact"><span class="k">Died</span><span class="v {{sel.diedCls}}">{{sel.died}}</span></div>
+        <div class="fact"><span class="k">Sex</span><span class="v">{{sel.sex}}</span></div>
+        <div class="fact"><span class="k">Sources</span><span class="v">{{sel.sources}}</span></div>
+      </div>
+
+      <div class="facts">
+        <p class="lbl" style="margin-top:16px">Immediate family</p>
+        <sc-for list="{{sel.rels}}" as="r" hint-placeholder-count="3">
+          <div class="rel"><span class="r">{{r.role}}</span><span>{{r.name}}</span></div>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{sel.hasConflict}}" hint-placeholder-val="{{false}}">
+        <div class="warn"><b>Contradiction</b>{{sel.conflict}}</div>
+      </sc-if>
+      <sc-if value="{{sel.hasNote}}" hint-placeholder-val="{{false}}">
+        <div class="quietnote">{{sel.note}}</div>
+      </sc-if>
+
+      <div class="acts">
+        <button class="btn ghost" onClick="{{sel.reroot}}">Measure from here</button>
+        <button class="btn">Open record</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":1760,"height":900}}'>
+/* ── The family, from the project's own seed fixture ─────────────────────────
+   Kept faithful, including the records whose data contradicts itself — those
+   are exactly what the review flags point at. Telugu spellings are
+   transliterations for the family to correct.                                */
+const PEOPLE = {
+  1:  {n:'Aditya Varun',       s:'Varma',    te:'ఆదిత్య వరుణ్',     ts:'వర్మ',   x:'M', b:1990, bp:'exact', alive:true},
+  2:  {n:'Bharath Kiran',      s:'Varma',    te:'భరత్ కిరణ్',       ts:'వర్మ',   x:'M', b:1993, bp:'exact', alive:true},
+  3:  {n:'Chandra Mohan Babu', s:'Varma',    te:'చంద్ర మోహన్ బాబు', ts:'వర్మ',   x:'M', b:1958, bp:'exact', alive:true},
+  4:  {n:'Deepa Latha',        s:'Reddy',    te:'దీప లత',           ts:'రెడ్డి', x:'F', b:1962, bp:'exact', alive:true},
+  5:  {n:'Eshwar Datta',       s:'Varma',    te:'ఈశ్వర్ దత్త',      ts:'వర్మ',   x:'M', b:1928, d:2004, bp:'exact'},
+  6:  {n:'Girija',             s:'Sharma',   te:'గిరిజ',            ts:'శర్మ',   x:'F', b:1932, d:2011, bp:'exact'},
+  8:  {n:'Parent1',            s:'Varma',    te:'—',                ts:'వర్మ',   x:'M', b:1901, d:1974, bp:'about',
+       note:'No given name recorded — better marked unknown than left as “Parent1”.'},
+  9:  {n:'Parent2',            s:'Varma',    te:'—',                ts:'వర్మ',   x:'F', b:1905, d:1981, bp:'about',
+       note:'No given name recorded.'},
+  7:  {n:'Harinath',           s:'Sharma',   te:'హరినాథ్',          ts:'శర్మ',   x:'M', b:null, alive:true},
+  10: {n:'Kalyani',            s:'Naidu',    te:'కళ్యాణి',          ts:'నాయుడు', x:'F', b:1959, bp:'exact', alive:true},
+  11: {n:'Lokesh',             s:'Sharma',   te:'లోకేష్',           ts:'శర్మ',   x:'M', b:1991, bp:'exact', alive:true},
+  29: {n:'Manoj',              s:'Sharma',   te:'మనోజ్',            ts:'శర్మ',   x:'M', b:1995, bp:'exact', alive:true},
+  12: {n:'Madhava',            s:'Varma',    te:'మాధవ',             ts:'వర్మ',   x:'M', b:null, alive:true},
+  13: {n:'Nirmala',            s:'Varma',    te:'నిర్మల',           ts:'వర్మ',   x:'F', b:1957, bp:'exact', alive:true},
+  14: {n:'Padmini',            s:'Varma',    te:'పద్మిని',          ts:'వర్మ',   x:'F', b:1984, bp:'exact', alive:true},
+  15: {n:'Raghava',            s:'Varma',    te:'రాఘవ',             ts:'వర్మ',   x:'M', b:1987, bp:'exact', alive:true},
+  24: {n:'Gowri',              s:'Varma',    te:'గౌరి',             ts:'వర్మ',   x:'F', b:1961, bp:'exact', alive:true},
+  23: {n:'Dinesh',             s:'Chowdary', te:'దినేష్',           ts:'చౌదరి',  x:'M', b:1957, bp:'exact', alive:true},
+  25: {n:'Hema',               s:'Chowdary', te:'హేమ',              ts:'చౌదరి',  x:'F', b:1986, bp:'exact', alive:true,
+       conflict:'Recorded as female while also carrying a son-of link and a husband-of link. These cannot all be right, and every relationship label on this branch depends on which one gives.'},
+  26: {n:'Indira',             s:'Chowdary', te:'ఇందిర',            ts:'చౌదరి',  x:'F', b:1989, bp:'exact', alive:true},
+  20: {n:'Yeshwanth',          s:'Varma',    te:'యశ్వంత్',          ts:'వర్మ',   x:'M', b:1964, bp:'exact', alive:true},
+  21: {n:'Bhavani',            s:'Varma',    te:'భవాని',            ts:'వర్మ',   x:'F', b:1966, bp:'exact', alive:true},
+  22: {n:'Chandana Sri',       s:'Varma',    te:'చందన శ్రీ',        ts:'వర్మ',   x:'F', b:1992, bp:'exact', alive:true,
+       note:'Sex not yet confirmed against a source.'}
+};
+
+const UNIONS = [[3,4],[5,6],[7,10],[12,13],[23,24],[20,21],[8,9]];
+/* child -> [{p:parentId, adoptive?:true}] — the role lives on the LINK, not the person */
+const PARENTS = {
+  1:[{p:3},{p:4}], 2:[{p:3},{p:4}],
+  6:[{p:8},{p:9}],
+  3:[{p:5},{p:6}], 12:[{p:5},{p:6}], 24:[{p:5},{p:6}], 20:[{p:5},{p:6}],
+  /* the within-family adoption: born to 5+6, adopted by 8+9 (Girija's own parents) */
+  7:[{p:5},{p:6},{p:8,adoptive:true},{p:9,adoptive:true}],
+  11:[{p:7},{p:10}], 29:[{p:7},{p:10}],
+  14:[{p:12},{p:13}], 15:[{p:12},{p:13}],
+  25:[{p:23},{p:24}], 26:[{p:23},{p:24}],
+  22:[{p:20},{p:21}]
+};
+
+/* Seniority is a THREE-state answer, because the data often cannot supply it. Every person
+   in the project's seed graph carries the same placeholder date, so for most pairs the honest
+   answer is "not recorded" — and Telugu cannot name a brother or a paternal uncle without it.
+   `order` holds answers a family member has supplied in the session. */
+function seniority(x, y, order) {
+  const key = Math.min(x, y) + '-' + Math.max(x, y);
+  if (order && order[key]) return order[key] === y;
+  const bx = PEOPLE[x].b, by = PEOPLE[y].b;
+  if (bx == null || by == null || bx === by) return null;
+  return by < bx;
+}
+
+const full   = (id) => PEOPLE[id].n + ' ' + PEOPLE[id].s;
+const fullTe = (id) => PEOPLE[id].te + ' ' + PEOPLE[id].ts;
+const years  = (id) => {
+  const p = PEOPLE[id];
+  if (p.b == null) return 'birth year not recorded';
+  return p.d ? (p.b + '–' + p.d) : ('b. ' + p.b);
+};
+const spouseOf = (id) => {
+  for (const u of UNIONS) { if (u[0] === id) return u[1]; if (u[1] === id) return u[0]; }
+  return null;
+};
+const parentsOf  = (id) => (PARENTS[id] || []).filter((r) => !r.adoptive).map((r) => r.p);
+const childrenOf = (id) => Object.keys(PARENTS)
+  .filter((c) => PARENTS[c].some((r) => r.p === id))
+  .map(Number)
+  /* children with no recorded year keep a stable position at the end rather than being
+     sorted by a number that does not exist */
+  .sort((a, b) => (PEOPLE[a].b == null ? 1e9 : PEOPLE[a].b) - (PEOPLE[b].b == null ? 1e9 : PEOPLE[b].b));
+
+/* ── Layer 1 · ancestor paths, depth-capped, carrying whether the route
+      passed through an adoptive link ─────────────────────────────────────── */
+function ancestorRoutes(id, cap) {
+  /* Keyed on the ancestor AND on whether the route passed through an adoptive link, so a
+     person reachable both by birth and by adoption keeps both routes. Keying on the ancestor
+     alone let the shorter route delete the other one — which is how a second, perfectly real
+     relationship disappears from the record. */
+  const out = new Map();
+  const walk = (cur, path, viaAdoptive) => {
+    if (path.length - 1 > cap) return;
+    const key = cur + '|' + (viaAdoptive ? 1 : 0);
+    const seen = out.get(key);
+    if (!seen || seen.path.length > path.length) {
+      out.set(key, {anc: cur, path: path, adoptive: viaAdoptive});
+    }
+    for (const link of (PARENTS[cur] || [])) {
+      if (path.indexOf(link.p) === -1) {
+        walk(link.p, path.concat([link.p]), viaAdoptive || !!link.adoptive);
+      }
+    }
+  };
+  walk(id, [id], false);
+  return out;
+}
+
+/* ── Layer 2 · canonical kinship structs — no strings, fully testable ────── */
+function structFrom(from, to, best, order) {
+  const a = best.a, b = best.b;
+  const sex = PEOPLE[to].x;
+  const elder = seniority(from, to, order);
+  const side = a > 0 ? (PEOPLE[best.pathA[1]].x === 'M' ? 'paternal' : 'maternal') : 'na';
+  const adoptive = best.adoptive;
+
+  if (a === 0) return {kind: 'descendant', depth: b, sex: sex, elder: elder, side: side, adoptive: adoptive};
+  if (b === 0) return {kind: 'ancestor',  depth: a, sex: sex, elder: elder, side: side, adoptive: adoptive};
+  if (a === 1 && b === 1) return {kind: 'sibling', sex: sex, elder: elder, side: side,
+                                  senPair: [from, to], adoptive: adoptive};
+  if (b === 1 && a >= 2) {
+    const linkSex = PEOPLE[best.pathA[1]].x;
+    return {kind: 'parentSibling', sex: sex, side: side, linkSex: linkSex, up: a - 2,
+            elder: seniority(best.pathA[1], to, order),
+            senPair: [best.pathA[1], to], adoptive: adoptive};
+  }
+  if (a === 1 && b >= 2) {
+    /* parallel vs cross is relative to the VIEWER's sex, not the linking parent's alone:
+       a man's brother's child is parallel, a woman's brother's child is cross. */
+    return {kind: 'niblings', sex: sex, side: side, elder: elder, down: b - 2,
+            linkSex: PEOPLE[best.pathB[1]].x,
+            parallel: PEOPLE[from].x === PEOPLE[best.pathB[1]].x, adoptive: adoptive};
+  }
+
+  /* cousins: PARALLEL when the two linking parents share a sex, CROSS when they differ.
+     English has one word for both; Telugu has two families of words. */
+  return {kind: 'cousin', degree: Math.min(a, b) - 1, removal: Math.abs(a - b),
+          up: a > b,
+          /* someone a generation above you is elder-or-younger relative to your PARENT,
+             not to you — Peddananna vs Chinnanna turns on that comparison */
+          elderThanLink: seniority(best.pathA[1], to, order),
+          senPair: a > b ? [best.pathA[1], to] : [from, to],
+          parallel: PEOPLE[best.pathA[1]].x === PEOPLE[best.pathB[1]].x,
+          linkSex: PEOPLE[best.pathA[1]].x,
+          sex: sex, elder: elder, side: side, adoptive: adoptive,
+          senPairSelf: [from, to]};
+}
+
+/* ALL the genuine relationships between two people, not just the closest one.
+   Several people here are connected by more than one route — born into one household and
+   adopted into another, or married to a relative — and each route is a real relationship
+   with its own name. A purely-biological route and a route through an adoptive link are
+   different KINDS of relation, so the shortest of each is returned; ties at equal distance
+   are kept when they read differently. */
+function kinshipAll(from, to, noSpouseHop, order) {
+  if (from === to) return [{kind: 'self'}];
+
+  const A = ancestorRoutes(from, 6), B = ancestorRoutes(to, 6);
+  const byAnc = new Map();
+  A.forEach(function (ra) {
+    if (!byAnc.has(ra.anc)) byAnc.set(ra.anc, []);
+    byAnc.get(ra.anc).push(ra);
+  });
+
+  const cands = [];
+  B.forEach(function (rb) {
+    const list = byAnc.get(rb.anc);
+    if (!list) return;
+    for (const ra of list) {
+      cands.push({a: ra.path.length - 1, b: rb.path.length - 1,
+                  pathA: ra.path, pathB: rb.path,
+                  adoptive: ra.adoptive || rb.adoptive});
+    }
+  });
+
+  if (!cands.length) {
+    /* One spouse hop only. Without the guard, two blood-unrelated spouses recurse
+       to → spouse → to forever, because spouseOf is symmetric. */
+    const sp = spouseOf(to);
+    if (sp && !noSpouseHop) {
+      const via = kinshipAll(from, sp, true, order)[0];
+      if (via.kind !== 'none') return [{kind: 'affinal', via: via, viaSex: PEOPLE[to].x}];
+    }
+    return [{kind: 'none'}];
+  }
+
+  const results = [];
+  [cands.filter(function (c) { return !c.adoptive; }),
+   cands.filter(function (c) { return c.adoptive; })].forEach(function (group) {
+    if (!group.length) return;
+    let min = Infinity;
+    group.forEach(function (c) { if (c.a + c.b < min) min = c.a + c.b; });
+    const seen = {};
+    group.forEach(function (c) {
+      if (c.a + c.b !== min) return;
+      const k = structFrom(from, to, c, order);
+      const label = renderEn(k);
+      if (!seen[label]) { seen[label] = true; results.push(k); }
+    });
+  });
+  return results.length ? results : [{kind: 'none'}];
+}
+
+/* the closest single relationship, for the compact chip on a card */
+function kinship(from, to, order) { return kinshipAll(from, to, false, order)[0]; }
+
+/* ── Layer 3a · English rendering ───────────────────────────────────────── */
+const ORD = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth'];
+const TIMES = ['', 'once', 'twice', 'three times'];
+const ordinal = (n) => ORD[n] || (n + 'th');
+const times = (n) => TIMES[n] || (n + ' times');
+const greats = (n) => (n > 0 ? 'Great-'.repeat(n) : '');
+function renderEn(k) {
+  if (k.kind === 'self') return 'This is you';
+  if (k.kind === 'none') return 'No recorded blood relation';
+  const m = k.sex === 'M';
+  const adopt = k.adoptive ? ' (adoptive)' : '';
+  if (k.kind === 'affinal') {
+    /* the root's own spouse must not render as "This is you's wife" */
+    if (k.via.kind === 'self') return k.viaSex === 'M' ? 'Husband' : 'Wife';
+    return renderEn(k.via) + (k.viaSex === 'M' ? '’s husband' : '’s wife');
+  }
+  if (k.kind === 'ancestor') {
+    if (k.depth === 1) return (m ? 'Father' : 'Mother') + adopt;
+    if (k.depth === 2) return (k.side === 'paternal' ? 'Paternal ' : 'Maternal ') + (m ? 'grandfather' : 'grandmother') + adopt;
+    return 'Great-'.repeat(k.depth - 2) + (m ? 'grandfather' : 'grandmother') + adopt;
+  }
+  if (k.kind === 'descendant') {
+    if (k.depth === 1) return (m ? 'Son' : 'Daughter') + adopt;
+    if (k.depth === 2) return (m ? 'Grandson' : 'Granddaughter') + adopt;
+    return 'Great-'.repeat(k.depth - 2) + (m ? 'grandson' : 'granddaughter') + adopt;
+  }
+  if (k.kind === 'sibling') {
+    const rank = k.elder === null ? '' : (k.elder ? 'Elder ' : 'Younger ');
+    return rank + (m ? 'Brother' : 'Sister') + adopt;
+  }
+  if (k.kind === 'parentSibling') {
+    if (k.up > 0) return greats(k.up - 1) + (m ? 'Granduncle' : 'Grandaunt') + adopt;
+    const rank = k.elder === null ? '' : (k.elder ? 'elder ' : 'younger ');
+    return (k.linkSex === 'M' ? 'Father' : 'Mother') + '’s ' + rank +
+           (m ? 'brother' : 'sister') + adopt;
+  }
+  if (k.kind === 'niblings') {
+    if (k.down > 0) return greats(k.down - 1) + (m ? 'Grandnephew' : 'Grandniece') + adopt;
+    return (m ? 'Nephew' : 'Niece') + adopt;
+  }
+  if (k.kind === 'cousin') {
+    let s = ordinal(k.degree) + ' cousin';
+    if (k.removal) s += ' ' + times(k.removal) + ' removed';
+    return s + adopt;
+  }
+  return '—';
+}
+
+/* ── Layer 3b · Telugu rendering — a DIFFERENT function, not a translation ──
+   It selects on side first, then seniority, then sex, and treats parallel
+   cousins as siblings. No lookup table keyed on English labels can reach
+   that, which is precisely why the current reducer cannot be localised.    */
+const T = (te, roman, gloss) => ({te: te, roman: roman, gloss: gloss});
+
+/* ── Regional and household variants ──────────────────────────────────────────
+   The same relation carries different words depending on who is speaking. This family
+   says చిన్నాన్న on the father's side and కక్కయ్య on the mother's, and both are correct.
+   That cannot live in the composition table: it is a rendering choice made AFTER the
+   relationship is known, which is exactly why the engine keeps the relationship as a
+   struct and leaves the words to the last layer.
+
+   These are starting suggestions, not authority. The family edits them — see the
+   Vocabulary artboard. Keyed on the base term so no call site has to know about it. */
+const VOCAB = {
+  'చిన్నాన్న':  {maternal: {te: 'కక్కయ్య', roman: 'Kakkayya'},
+                also: [{te: 'బాబాయి', roman: 'Babai', usage: 'widely used'}]},
+  'పెద్దనాన్న': {also: [{te: 'పెదనాన్న', roman: 'Pedananna', usage: 'shorter form'},
+                        {te: 'దొడ్డనాన్న', roman: 'Doddananna', usage: 'Rayalaseema'}]},
+  'మామయ్య':    {also: [{te: 'మేనమామ', roman: 'Menamama', usage: 'more formal'}]},
+  'అత్త':       {also: [{te: 'మేనత్త', roman: 'Menattha', usage: 'more formal'}]},
+  'పిన్ని':     {also: [{te: 'చిన్నమ్మ', roman: 'Chinnamma', usage: 'widely used'}]},
+  'పెద్దమ్మ':   {also: [{te: 'పెత్తల్లి', roman: 'Pettalli', usage: 'older form'}]},
+  'నానమ్మ':    {also: [{te: 'నాయనమ్మ', roman: 'Nayanamma', usage: 'widely used'}]},
+  'తాత':        {also: [{te: 'తాతయ్య', roman: 'Thaathayya', usage: 'affectionate'}]},
+  'అన్నయ్య':    {also: [{te: 'అన్న', roman: 'Anna', usage: 'shorter form'}]},
+  'అక్క':       {also: [{te: 'అక్కయ్య', roman: 'Akkayya', usage: 'affectionate'}]},
+  'చెల్లి':      {also: [{te: 'చెల్లెలు', roman: 'Chellelu', usage: 'fuller form'}]},
+  'కొడుకు':     {also: [{te: 'అబ్బాయి', roman: 'Abbayi', usage: 'everyday'}]},
+  'కూతురు':     {also: [{te: 'అమ్మాయి', roman: 'Ammayi', usage: 'everyday'}]}
+};
+
+/* Resolve a term to the word this reader should see. Three sources, in order of precedence:
+     1. a PIN on this particular person — "everyone calls this uncle Babai"
+     2. the vocabulary of the side of the family currently selected
+     3. the default form
+   Equivalents come from the built-in list plus anything the family has added, and the
+   built-in list is only a starting point: `custom` is where discovered words live. */
+function vocabForm(t, side, opts) {
+  opts = opts || {};
+  const custom = opts.custom || {};
+  const pins = opts.pins || {};
+  const pid = opts.personId;
+
+  const one = (term) => {
+    const entry = VOCAB[term.te] || {};
+    const added = custom[term.te] || [];
+    const pin = (pid != null) ? pins[pid + '|' + term.te] : null;
+
+    const swapped = (side === 'maternal' && entry.maternal) ? entry.maternal : null;
+    const base = swapped ? swapped : {te: term.te, roman: term.roman};
+    const current = pin ? pin : base;
+
+    const pool = [];
+    if (entry.maternal) {
+      pool.push(swapped ? {te: term.te, roman: term.roman, usage: 'father’s side of this family'}
+                        : {te: entry.maternal.te, roman: entry.maternal.roman,
+                           usage: 'mother’s side of this family'});
+    }
+    (entry.also || []).forEach((v) => pool.push(v));
+    added.forEach((v) => pool.push({te: v.te, roman: v.roman, usage: v.usage, added: true}));
+    if (pin && pin.te !== base.te) pool.push({te: base.te, roman: base.roman, usage: 'the usual word'});
+
+    return {te: current.te, roman: current.roman, base: term.te, pinned: !!pin,
+            also: pool.filter((v) => v.te !== current.te)
+                      .map((v) => Object.assign({base: term.te}, v))};
+  };
+
+  if (t.halves) {
+    const a = one(t.halves[0]), b = one(t.halves[1]);
+    return {te: a.te + ' / ' + b.te, roman: a.roman + ' / ' + b.roman, gloss: t.gloss,
+            unresolved: true, pinned: a.pinned || b.pinned,
+            bases: [a.base, b.base], also: a.also.concat(b.also)};
+  }
+  const r = one(t);
+  return {te: r.te, roman: r.roman, gloss: t.gloss, unresolved: t.unresolved,
+          pinned: r.pinned, bases: [r.base], also: r.also};
+}
+/* When Telugu needs a seniority the record does not hold, it returns the PAIR and says so,
+   rather than picking one and sounding certain. English has no equivalent problem, which is
+   the clearest possible demonstration that these are two languages, not two columns. */
+const PAIR = (te1, r1, te2, r2, gloss) => ({
+  te: te1 + ' / ' + te2, roman: r1 + ' / ' + r2, gloss: gloss, unresolved: true,
+  halves: [{te: te1, roman: r1}, {te: te2, roman: r2}]
+});
+function renderTe(k) {
+  if (k.kind === 'self') return T('నేను', 'Nenu', 'me');
+  if (k.kind === 'none') return T('—', '', 'no recorded relation');
+  const m = k.sex === 'M';
+
+  if (k.kind === 'affinal') {
+    const v = k.via;
+    if (v.kind === 'self') return k.viaSex === 'M' ? T('భర్త', 'Bhartha', 'husband') : T('భార్య', 'Bhaarya', 'wife');
+    if (v.kind === 'parentSibling' && v.side === 'paternal' && v.linkSex === 'M' && v.sex === 'M') {
+      /* father's brother's wife */
+      if (v.elder === null) return PAIR('పెద్దమ్మ', 'Peddamma', 'పిన్ని', 'Pinni',
+                                        'depends whether her husband is older than your father');
+      return v.elder ? T('పెద్దమ్మ', 'Peddamma', 'father’s elder brother’s wife')
+                     : T('పిన్ని', 'Pinni', 'father’s younger brother’s wife');
+    }
+    if (v.kind === 'parentSibling' && v.sex === 'F' && k.viaSex === 'M') {
+      /* father's or mother's sister's husband */
+      return T('మామయ్య', 'Maamayya', (v.linkSex === 'M' ? 'father' : 'mother') + '’s sister’s husband');
+    }
+    if (v.kind === 'sibling' && v.sex === 'M' && k.viaSex === 'F') {
+      if (v.elder === null) return PAIR('వదిన', 'Vadina', 'మరదలు', 'Maradalu', 'depends who is older');
+      return v.elder ? T('వదిన', 'Vadina', 'elder brother’s wife') : T('మరదలు', 'Maradalu', 'younger brother’s wife');
+    }
+    if (v.kind === 'sibling' && v.sex === 'F' && k.viaSex === 'M') {
+      if (v.elder === null) return PAIR('బావ', 'Baava', 'మరిది', 'Maridi', 'depends who is older');
+      return v.elder ? T('బావ', 'Baava', 'elder sister’s husband') : T('మరిది', 'Maridi', 'younger sister’s husband');
+    }
+    const inner = renderTe(v);
+    return T(inner.te + (k.viaSex === 'M' ? ' భర్త' : ' భార్య'),
+             inner.roman + (k.viaSex === 'M' ? ' bhartha' : ' bhaarya'),
+             inner.gloss + '’s ' + (k.viaSex === 'M' ? 'husband' : 'wife'));
+  }
+
+  if (k.kind === 'ancestor') {
+    if (k.depth === 1) return m ? T('నాన్న', 'Naanna', 'father') : T('అమ్మ', 'Amma', 'mother');
+    if (k.depth === 2) {
+      if (m) return T('తాత', 'Thaatha', k.side + ' grandfather');
+      return k.side === 'paternal' ? T('నానమ్మ', 'Nanamma', 'father’s mother')
+                                   : T('అమ్మమ్మ', 'Ammamma', 'mother’s mother');
+    }
+    return m ? T('ముత్తాత', 'Muthaatha', 'great-grandfather') : T('ముత్తవ్వ', 'Muthavva', 'great-grandmother');
+  }
+  if (k.kind === 'descendant') {
+    if (k.depth === 1) return m ? T('కొడుకు', 'Koduku', 'son') : T('కూతురు', 'Kuthuru', 'daughter');
+    return m ? T('మనవడు', 'Manavadu', 'grandson') : T('మనవరాలు', 'Manavaralu', 'granddaughter');
+  }
+  /* A parallel cousin one generation off is addressed with parent's-sibling or
+     child-of-sibling terms, NOT with the cross-cousin (marriageable-kin) terms. Getting
+     this wrong is exactly the collapse this renderer exists to avoid. */
+  if (k.kind === 'cousin' && k.parallel && k.removal > 0) {
+    if (k.up) {
+      if (m) {
+        if (k.elderThanLink === null) return PAIR('పెద్దనాన్న', 'Peddananna', 'చిన్నాన్న', 'Chinnanna',
+                                                  'depends which is older than your parent');
+        return k.elderThanLink ? T('పెద్దనాన్న', 'Peddananna', 'parallel uncle, elder than your parent')
+                               : T('చిన్నాన్న', 'Chinnanna', 'parallel uncle, younger than your parent');
+      }
+      return T('అత్త', 'Attha', 'parallel aunt');
+    }
+    return m ? T('కొడుకు', 'Koduku', 'parallel nephew, addressed as a son')
+             : T('కూతురు', 'Kuthuru', 'parallel niece, addressed as a daughter');
+  }
+  /* parallel cousins take sibling terms — the cultural fact English erases */
+  if (k.kind === 'sibling' || (k.kind === 'cousin' && k.parallel && k.removal === 0)) {
+    if (k.elder === null) {
+      return m ? PAIR('అన్నయ్య', 'Annayya', 'తమ్ముడు', 'Thammudu', 'depends who is older')
+               : PAIR('అక్క', 'Akka', 'చెల్లి', 'Chelli', 'depends who is older');
+    }
+    if (m) return k.elder ? T('అన్నయ్య', 'Annayya', 'elder brother') : T('తమ్ముడు', 'Thammudu', 'younger brother');
+    return k.elder ? T('అక్క', 'Akka', 'elder sister') : T('చెల్లి', 'Chelli', 'younger sister');
+  }
+  if (k.kind === 'parentSibling') {
+    if (k.up > 0) {
+      /* Telugu extends the grandparent terms to a grandparent's siblings */
+      if (m) return T('తాత', 'Thaatha', 'grandparent’s brother, addressed as grandfather');
+      return k.side === 'paternal' ? T('నానమ్మ', 'Nanamma', 'grandparent’s sister')
+                                   : T('అమ్మమ్మ', 'Ammamma', 'grandparent’s sister');
+    }
+    if (k.linkSex === 'M') {
+      /* father's side: split by seniority for men, one term for women */
+      if (m) {
+        if (k.elder === null) return PAIR('పెద్దనాన్న', 'Peddananna', 'చిన్నాన్న', 'Chinnanna',
+                                          'depends whether he is older than your father');
+        return k.elder ? T('పెద్దనాన్న', 'Peddananna', 'father’s elder brother')
+                       : T('చిన్నాన్న', 'Chinnanna', 'father’s younger brother');
+      }
+      return T('అత్త', 'Attha', 'father’s sister');
+    }
+    /* mother's side: one term for men, split by seniority for women */
+    if (m) return T('మామయ్య', 'Maamayya', 'mother’s brother');
+    if (k.elder === null) return PAIR('పెద్దమ్మ', 'Peddamma', 'పిన్ని', 'Pinni',
+                                      'depends whether she is older than your mother');
+    return k.elder ? T('పెద్దమ్మ', 'Peddamma', 'mother’s elder sister')
+                   : T('పిన్ని', 'Pinni', 'mother’s younger sister');
+  }
+  if (k.kind === 'niblings') {
+    if (k.down > 0) return m ? T('మనవడు', 'Manavadu', 'sibling’s grandson')
+                             : T('మనవరాలు', 'Manavaralu', 'sibling’s granddaughter');
+    /* Cross vs parallel again, and it depends on who is asking: a same-sex sibling's
+       child is parallel and takes child terms; an opposite-sex sibling's child is cross
+       and takes its own word. English has one pair for all four cases. */
+    const via = k.linkSex === 'M' ? 'brother' : 'sister';
+    if (k.parallel) {
+      return m ? T('కొడుకు', 'Koduku', via + '’s son, addressed as a son')
+               : T('కూతురు', 'Kuthuru', via + '’s daughter, addressed as a daughter');
+    }
+    return m ? T('మేనల్లుడు', 'Menalludu', via + '’s son')
+             : T('మేనకోడలు', 'Menakodalu', via + '’s daughter');
+  }
+  if (k.kind === 'cousin') {
+    /* cross cousins are marriageable kin and carry their own terms */
+    if (k.elder === null) {
+      return m ? PAIR('బావ', 'Baava', 'మరిది', 'Maridi', 'depends who is older')
+               : PAIR('వదిన', 'Vadina', 'మరదలు', 'Maradalu', 'depends who is older');
+    }
+    if (m) return k.elder ? T('బావ', 'Baava', 'elder cross-cousin') : T('మరిది', 'Maridi', 'younger cross-cousin');
+    return k.elder ? T('వదిన', 'Vadina', 'elder cross-cousin') : T('మరదలు', 'Maradalu', 'younger cross-cousin');
+  }
+  return T('—', '', '');
+}
+
+function whyText(k) {
+  if (k.kind === 'self') return 'Everything on the canvas is measured from here.';
+  if (k.kind === 'none') return 'No common ancestor within six generations.';
+  if (k.kind === 'affinal') {
+    if (k.via.kind === 'self') return 'Married to you — an affinal link, not a blood one.';
+    return 'Related by marriage: ' + renderEn(k.via).toLowerCase() +
+           ' is the blood relative, and this is their ' +
+           (k.viaSex === 'M' ? 'husband' : 'wife') + '.';
+  }
+  const bits = [];
+  if (k.kind === 'ancestor') {
+    bits.push(k.depth === 1 ? 'one generation above you'
+                            : k.depth + ' generations above you');
+  }
+  if (k.kind === 'descendant') {
+    bits.push(k.depth === 1 ? 'one generation below you'
+                            : k.depth + ' generations below you');
+  }
+  if (k.kind === 'sibling') bits.push('you share a parent');
+  if (k.kind === 'parentSibling') bits.push('sibling of your ' + (k.linkSex === 'M' ? 'father' : 'mother'));
+  if (k.kind === 'niblings') bits.push('child of your ' + (k.linkSex === 'M' ? 'brother' : 'sister'));
+  if (k.kind === 'cousin') {
+    bits.push('common ancestor ' + (k.degree + 1) + ' generations up');
+    bits.push(k.parallel ? 'parallel cousin — the two linking parents are the same sex, which is why Telugu uses a sibling term'
+                         : 'cross cousin — the linking parents are opposite sexes, so Telugu uses a distinct, marriageable-kin term');
+    if (k.removal) bits.push('removed ' + times(k.removal) + ' — one side sits a generation further down');
+  }
+  if (k.side && k.side !== 'na') bits.push(k.side + ' side');
+  if (k.elder === true) bits.push('elder than you');
+  else if (k.elder === false) bits.push('younger than you');
+  else if (k.elder === null && k.kind !== 'ancestor' && k.kind !== 'descendant')
+    bits.push('birth order not recorded');
+  if (k.adoptive) bits.push('the route passes through an adoptive link');
+  /* never return a bare full stop */
+  if (!bits.length) return 'A direct link in the record.';
+  return bits.join(' · ') + '.';
+}
+
+const CONFLICT_COUNT = Object.keys(PEOPLE).filter((k) => PEOPLE[k].conflict).length;
+const NOTE_COUNT = Object.keys(PEOPLE).filter((k) => PEOPLE[k].note).length;
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five'];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    /* `order` holds birth-order answers supplied in this session. Nothing in the project's
+       data can supply them: all 29 people in the seed graph carry the same placeholder date. */
+    this.state = {root: 1, sel: 7, lang: 'both', open: {3: true, 7: true},
+                  adopt: true, flags: true, order: {}, vocab: 'paternal',
+                  custom: {}, pins: {}, draftTe: '', draftUse: '', adding: false};
+  }
+
+  pick(id) { return () => this.setState({sel: id}); }
+
+  card(id) {
+    const st = this.state;
+    const links = kinshipAll(st.root, id, false, st.order);
+    const k = links[0];
+    const te = vocabForm(renderTe(k), st.vocab,
+                         {custom: st.custom, pins: st.pins, personId: id});
+    const cls = [];
+    if (id === st.sel) cls.push('sel');
+    if (id === st.root) cls.push('focus');
+    const adoptLink = (PARENTS[id] || []).some((r) => r.adoptive);
+    if (adoptLink && st.adopt) cls.push('adopt');
+    return {
+      id: id, name: full(id), te: fullTe(id), years: years(id),
+      sym: PEOPLE[id].x === 'F' ? 'f' : '',
+      kin: st.lang === 'te' ? te.te
+         : (st.lang === 'both' ? renderEn(k) + ' · ' + te.te : renderEn(k)),
+      kinCls: (st.lang !== 'en' && te.unresolved) ? 'unresolved' : '',
+      cls: cls.join(' '), pick: this.pick(id),
+      isRoot: id === st.root,
+      conflict: st.flags && !!PEOPLE[id].conflict,
+      note: st.flags && !!PEOPLE[id].note,
+      /* Being connected by more than one route is ordinary in this family, so it reads as a
+         quiet count in the card body rather than as a warning badge. */
+      multi: links.length > 1 && id !== st.root,
+      linksLabel: links.length + ' ways related to you',
+      adopted: adoptLink && st.adopt
+    };
+  }
+
+  branch(parentId) {
+    const st = this.state;
+    const sp = spouseOf(parentId);
+    const kids = childrenOf(parentId);
+    const isOpen = !!st.open[parentId];
+    const a = this.card(parentId), b = sp ? this.card(sp) : null;
+    /* The root's own parental line is emphasised; the aunts and uncles beside it are
+       compact, which also keeps the default row inside the frame.
+       A spouse is only shown once the branch is open, or on the root's own line. Showing
+       every uncle's wife at once is noise, and it pushes the row past any sane frame. */
+    const onRootLine = parentId === st.root || parentsOf(st.root).indexOf(parentId) !== -1;
+    return {
+      aName: a.name, aTe: a.te, aYears: a.years, aSym: a.sym, aKin: a.kin,
+      aKinCls: a.kinCls, aCls: a.cls, aPick: a.pick, aAdopted: a.adopted, aIsRoot: a.isRoot,
+      aConflict: a.conflict, aNote: a.note, aMulti: a.multi, aLinks: a.linksLabel,
+      aSizeCls: onRootLine ? '' : 'compact',
+      showSpouse: !!b && (isOpen || onRootLine),
+      bName: b ? b.name : '', bTe: b ? b.te : '', bYears: b ? b.years : '',
+      bSym: b ? b.sym : '', bKin: b ? b.kin : '', bKinCls: b ? b.kinCls : '', bCls: b ? b.cls : '',
+      bPick: b ? b.pick : null,
+      bConflict: b ? b.conflict : false, bNote: b ? b.note : false,
+      bMulti: b ? b.multi : false, bLinks: b ? b.linksLabel : '',
+      open: (isOpen || onRootLine) && kids.length > 0,
+      closed: !(isOpen || onRootLine) && kids.length > 0,
+      multiCls: kids.length > 1 ? 'multi' : '',
+      tickCls: kids.length > 1 ? 'tick' : '',
+      expandLabel: kids.length + (kids.length === 1 ? ' child' : ' children'),
+      toggle: () => {
+        const open = Object.assign({}, this.state.open);
+        open[parentId] = !open[parentId];
+        this.setState({open: open});
+      },
+      kids: kids.map((id) => this.card(id))
+    };
+  }
+
+  /* the tree restructures around whoever kinship is measured from */
+  frame() {
+    const root = this.state.root;
+    const ps = parentsOf(root);
+    const anchor = ps.filter((p) => PEOPLE[p].x === 'M')[0] || ps[0] || root;
+    const gp = parentsOf(anchor);
+    if (!gp.length) return {top: null, branchIds: [anchor]};
+    const gf = gp.filter((p) => PEOPLE[p].x === 'M')[0] || gp[0];
+    const gm = gp.filter((p) => p !== gf)[0];
+    return {top: [gf, gm].filter(Boolean), branchIds: childrenOf(gf)};
+  }
+
+  renderVals() {
+    const st = this.state;
+    const setLang = (v) => () => this.setState({lang: v});
+    const fr = this.frame();
+    const topA = fr.top ? this.card(fr.top[0]) : null;
+    const topB = fr.top && fr.top[1] ? this.card(fr.top[1]) : null;
+    const selLinks = kinshipAll(st.root, st.sel, false, st.order);
+    const selK = selLinks[0];
+    /* The one fact Telugu needs and the record does not hold. */
+    let askPair = null;
+    selLinks.forEach(function (k) {
+      if (askPair) return;
+      const t = renderTe(k);
+      if (!t.unresolved) return;
+      askPair = k.senPair || (k.via && k.via.senPair) || [st.root, st.sel];
+    });
+    /* Pin a word to THIS person: "everyone calls this uncle Babai". Optional — the
+       vocabulary above already gives a sensible default for everyone else. */
+    const pinTerm = (base, term) => () => {
+      const next = Object.assign({}, this.state.pins);
+      next[this.state.sel + '|' + base] = term;
+      this.setState({pins: next});
+    };
+    const unpinTerm = (bases) => () => {
+      const next = Object.assign({}, this.state.pins);
+      (bases || []).forEach((b) => { delete next[this.state.sel + '|' + b]; });
+      this.setState({pins: next});
+    };
+    const firstBase = () => {
+      const t = vocabForm(renderTe(selLinks[0]), st.vocab,
+                          {custom: st.custom, pins: st.pins, personId: st.sel});
+      return t.bases[0];
+    };
+    const setOrder = (elderId) => () => {
+      const next = Object.assign({}, this.state.order);
+      next[Math.min(askPair[0], askPair[1]) + '-' + Math.max(askPair[0], askPair[1])] = elderId;
+      this.setState({order: next});
+    };
+    const p = PEOPLE[st.sel];
+
+    const rels = [];
+    (PARENTS[st.sel] || []).forEach((r) => {
+      rels.push({role: (r.adoptive ? 'Adoptive ' : '') + (PEOPLE[r.p].x === 'M' ? 'father' : 'mother'),
+                 name: full(r.p)});
+    });
+    const sp = spouseOf(st.sel);
+    if (sp) rels.push({role: PEOPLE[sp].x === 'M' ? 'Husband' : 'Wife', name: full(sp)});
+    childrenOf(st.sel).forEach((c) => {
+      rels.push({role: PEOPLE[c].x === 'M' ? 'Son' : 'Daughter', name: full(c)});
+    });
+    if (!rels.length) rels.push({role: '—', name: 'No links recorded yet'});
+
+    return {
+      counts: {people: Object.keys(PEOPLE).length, gens: 4,
+               flags: CONFLICT_COUNT + ' contradiction, ' + NOTE_COUNT + ' incomplete'},
+      lang: {
+        setEn: setLang('en'), setTe: setLang('te'), setBoth: setLang('both'),
+        enCls: st.lang === 'en' ? 'on' : '', teCls: st.lang === 'te' ? 'on' : '',
+        bothCls: st.lang === 'both' ? 'on' : '',
+        enOn: st.lang === 'en', teOn: st.lang === 'te', bothOn: st.lang === 'both',
+        chipCls: st.lang === 'te' ? 'tel' : ''
+      },
+      toggles: {
+        adopt: () => this.setState({adopt: !st.adopt}),
+        flags: () => this.setState({flags: !st.flags}),
+        adoptCls: st.adopt ? 'on' : '', flagsCls: st.flags ? 'on' : '',
+        adoptOn: st.adopt, flagsOn: st.flags
+      },
+      rowCls: (topA ? 'hastop ' : '') + (fr.branchIds.length > 1 ? 'multi' : ''),
+      vocab: {
+        paternal: () => this.setState({vocab: 'paternal'}),
+        maternal: () => this.setState({vocab: 'maternal'}),
+        pCls: st.vocab === 'paternal' ? 'on' : '', mCls: st.vocab === 'maternal' ? 'on' : '',
+        pOn: st.vocab === 'paternal', mOn: st.vocab === 'maternal',
+        hint: st.vocab === 'maternal'
+          ? 'Your mother’s people say కక్కయ్య where your father’s say చిన్నాన్న. Same relation, different word.'
+          : 'Switch to hear the tree in your mother’s side’s words — కక్కయ్య rather than చిన్నాన్న.'
+      },
+      root: {name: full(st.root), te: fullTe(st.root), years: years(st.root), place: 'Vijayawada'},
+      hasTop: !!topA,
+      top: {
+        aName: topA ? topA.name : '', aTe: topA ? topA.te : '', aYears: topA ? topA.years : '',
+        aSym: topA ? topA.sym : '', aKin: topA ? topA.kin : '', aKinCls: topA ? topA.kinCls : '', aCls: topA ? topA.cls : '',
+        aPick: topA ? topA.pick : null,
+        aConflict: topA ? topA.conflict : false, aNote: topA ? topA.note : false,
+        aMulti: topA ? topA.multi : false, aLinks: topA ? topA.linksLabel : '',
+        hasB: !!topB,
+        bName: topB ? topB.name : '', bTe: topB ? topB.te : '', bYears: topB ? topB.years : '',
+        bSym: topB ? topB.sym : '', bKin: topB ? topB.kin : '', bKinCls: topB ? topB.kinCls : '', bCls: topB ? topB.cls : '',
+        bPick: topB ? topB.pick : null,
+        bConflict: topB ? topB.conflict : false, bNote: topB ? topB.note : false,
+        bMulti: topB ? topB.multi : false, bLinks: topB ? topB.linksLabel : ''
+      },
+      branches: fr.branchIds.map((id) => this.branch(id)),
+      sel: {
+        name: full(st.sel), te: fullTe(st.sel),
+        meta: years(st.sel) + '  ·  ' + (p.x === 'M' ? 'Male' : 'Female'),
+        linksHeading: selLinks.length > 1 ? 'Related to you in ' + WORDS[selLinks.length] + ' ways'
+                                          : 'Relationship to you',
+        links: selLinks.map(function (k) {
+          const t = vocabForm(renderTe(k), st.vocab,
+                              {custom: st.custom, pins: st.pins, personId: st.sel});
+          return {
+            hasVia: selLinks.length > 1,
+            via: k.adoptive ? 'Through the adoption' : 'By birth',
+            en: renderEn(k), te: t.te,
+            gloss: t.roman + (t.gloss ? ' — ' + t.gloss : ''),
+            why: whyText(k),
+            hasAlso: t.also.length > 0,
+            also: t.also.map(function (v) {
+              return {te: v.te, usage: v.usage, addedCls: v.added ? 'added' : '',
+                      pin: pinTerm(v.base, {te: v.te, roman: v.roman})};
+            }),
+            pinned: t.pinned,
+            unpin: unpinTerm(t.bases)
+          };
+        }),
+        firstName: PEOPLE[st.sel].n,
+        addOpen: st.adding,
+        openAdd: () => this.setState({adding: true, draftTe: '', draftUse: ''}),
+        cancelAdd: () => this.setState({adding: false}),
+        draftTe: st.draftTe,
+        draftUse: st.draftUse,
+        setDraftTe: (e) => this.setState({draftTe: e.target.value}),
+        setDraftUse: (e) => this.setState({draftUse: e.target.value}),
+        saveWord: () => {
+          const word = (this.state.draftTe || '').trim();
+          if (!word) { this.setState({adding: false}); return; }
+          const base = firstBase();
+          const next = Object.assign({}, this.state.custom);
+          next[base] = (next[base] || []).concat([{
+            te: word, roman: '', usage: (this.state.draftUse || '').trim() || 'added by your family'
+          }]);
+          this.setState({custom: next, adding: false, draftTe: '', draftUse: ''});
+        },
+        needsOrder: !!askPair,
+        orderQuestion: askPair
+          ? 'Telugu picks a different word depending on which of these two was born first. ' +
+            'The record does not say — every person in this tree carries the same placeholder date.'
+          : '',
+        orderAName: askPair ? full(askPair[0]) : '',
+        orderBName: askPair ? full(askPair[1]) : '',
+        orderA: askPair ? setOrder(askPair[0]) : null,
+        orderB: askPair ? setOrder(askPair[1]) : null,
+        multi: selLinks.length > 1,
+        multiNote: 'Both links are real and both are kept. Several people here are connected ' +
+                   'by more than one route — through a marriage inside the family, or through ' +
+                   'an adoption — and each route has its own name in Telugu.',
+        born: p.bp === 'about' ? 'about ' + p.b : String(p.b),
+        bornCls: p.bp === 'about' ? 'approx' : '',
+        died: p.d ? String(p.d) : (p.alive ? 'Living' : 'not recorded'),
+        diedCls: p.d || p.alive ? '' : 'approx',
+        sex: p.x === 'M' ? 'Male' : 'Female',
+        sources: '0 cited',
+        rels: rels,
+        hasConflict: !!p.conflict && st.flags,
+        conflict: p.conflict || '',
+        hasNote: !!p.note && st.flags,
+        note: p.note || '',
+        reroot: () => this.setState({root: st.sel})
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

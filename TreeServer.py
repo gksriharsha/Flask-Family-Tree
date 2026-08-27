@@ -1,13 +1,22 @@
-from Tree import create_app
+"""Development entrypoint.
 
-def post_request_cors(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,face-location,'
-                                                         'Task-id,start_id,end_ids,Vertex-id-map')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE')
-    return response
+Binds to the loopback interface by default. Every route in this application can read, rewrite or
+delete family records, so exposing it on a routable interface is an explicit decision -- set
+HOST if you mean it, and set FAMILYTREE_API_TOKEN first.
+
+For anything other than local development use the WSGI entrypoint:
+
+    gunicorn --bind 127.0.0.1:5000 --workers 2 wsgi:app
+"""
+
+import os
+
+from Tree import create_app
 
 if __name__ == '__main__':
     app = create_app()
-    app.after_request(post_request_cors)
-    app.run()
+    app.run(
+        host=os.environ.get('HOST', '127.0.0.1'),
+        port=int(os.environ.get('PORT', '5000')),
+        debug=False,
+    )

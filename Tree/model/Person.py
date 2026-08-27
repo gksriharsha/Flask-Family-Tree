@@ -1,28 +1,27 @@
-from Tree.model.Event import Event
-from Tree.model.Occupation import Occupation
 from gremlin_python.process.traversal import T
 
+from Tree.model.Event import Event
+from Tree.model.Occupation import Occupation
+
+# The graph property names for birth and death facts.
+#
+# This is the single most consequential fix in this pass. The write path used to emit
+# ``Date_of_Birth`` (capital B) while every reader -- functions.groovy's age check, the
+# person-retrieval projection, and this class's own read-back -- looked for ``Date_of_birth``.
+# With no declared schema, JanusGraph silently created two separate property keys, so the age
+# check threw for every person the API created, ``child()`` wrote no edges, the bare ``except``
+# swallowed it, and the endpoint still answered HTTP 200.
+#
+# Lowercase is the spelling chosen because it is what the readers, the Groovy helpers and the
+# existing seed data all already use, so no stored data has to be migrated.
+BIRTH_KEYS = {'Date': 'Date_of_birth', 'Time': 'Time_of_birth', 'Location': 'Place_of_birth'}
+DEATH_KEYS = {'Date': 'Date_of_death', 'Time': 'Time_of_death', 'Location': 'Place_of_death'}
+
+
 class Person:
-    """
-        This class is used for performing person based operations
-    """
+    """A person vertex."""
 
-    def __init__(self, Firstname: str = None, Gender=None, Lastname=None, Alive=None) -> object:
-        """
-
-        Parameters
-        ----------
-        Firstname : str
-        Date is stored as a string in yyyy-mm-dd format.
-        Gender : str
-        Gender is stored as a string
-        Lastname : str
-        Alive: str
-
-        Returns
-        -------
-        None
-        """
+    def __init__(self, Firstname=None, Gender=None, Lastname=None, Alive=None):
         self.ID = None
         self.Firstname = Firstname
         self.Lastname = Lastname
@@ -53,81 +52,73 @@ class Person:
             self.Death = value
 
     def convert_to_gremlin_node(self):
-        gremlinDictionary = {}
-        gremlinDictionary.update({'Gender': self.Gender})
-        gremlinDictionary.update({'Alive': self.Alive})
-        gremlinDictionary.update({'Firstname': self.Firstname})
-        gremlinDictionary.update({'Lastname': self.Lastname})
-        if self.Occupation is not None:
-            gremlinDictionary.update({'Occupation': str(Occupation(Organization=self.Occupation.Organization,
-                                                                   Job=self.Occupation.Job,
-                                                                   Start_year=self.Occupation.Start_year,
-                                                                   End_year=self.Occupation.End_year))})
-        if self.Birth is not None:
-            if self.Birth.Location is not None:
-                gremlinDictionary.update({'Place_of_Birth': self.Birth.Location})
-            if self.Birth.Date is not None:
-                gremlinDictionary.update({'Date_of_Birth': self.Birth.Date})
-            if self.Birth.Time is not None:
-                gremlinDictionary.update({'Time_of_Birth': self.Birth.Time})
-        if self.Death is not None:
-            if self.Death.Location is not None:
-                gremlinDictionary.update({'Place_of_Death': self.Death.Location})
-            if self.Death.Date is not None:
-                gremlinDictionary.update({'Date_of_Death': self.Death.Date})
-            if self.Death.Time is not None:
-                gremlinDictionary.update({'Time_of_Death': self.Death.Time})
-        return gremlinDictionary
+        """The property map to write to the graph. Only fields that were supplied are included,
+        so a partial update does not blank out stored values or write the string ``'None'``."""
+        properties = {}
+        for name in ('Gender', 'Alive', 'Firstname', 'Lastname'):
+            value = getattr(self, name)
+            if value is not None and value != '':
+                properties[name] = value
+
+        occupation = Occupation.coerce(self.Occupation)
+        if occupation is not None:
+            properties['Occupation'] = str(occupation)
+
+        for event, keys in ((self.Birth, BIRTH_KEYS), (self.Death, DEATH_KEYS)):
+            if event is None:
+                continue
+            for attribute, property_name in keys.items():
+                value = getattr(event, attribute, None)
+                if value is not None and value != '':
+                    properties[property_name] = value
+
+        return properties
+
+    def to_dict(self):
+        """The JSON shape for API responses.
+
+        Explicit rather than ``__dict__``: the original leaned on
+        ``json.dumps(..., default=lambda o: o.__dict__)``, which silently produced a *different
+        shape per record* because Event's fields were class attributes that never reached the
+        instance dict. Every record now carries the same keys, with nulls where a fact is
+        unknown, so the client can rely on the shape.
+        """
+        return {
+            'ID': self.ID,
+            'Firstname': self.Firstname,
+            'Lastname': self.Lastname,
+            'Gender': self.Gender,
+            'Alive': self.Alive,
+            'Occupation': self.Occupation,
+            'Birth': self.Birth.to_dict() if self.Birth is not None else None,
+            'Death': self.Death.to_dict() if self.Death is not None else None,
+            'native_to': self.native_to,
+        }
 
     @staticmethod
     def createPersonObject(attributes):
-        p = Person()
-        p.ID = attributes.pop(T.id)
-        if 'Gender' in attributes.keys():
-            p.Gender = attributes.pop('Gender')
-        if 'Alive' in attributes.keys():
-            p.Alive = attributes.pop('Alive')
-        if 'Firstname' in attributes.keys():
-            p.Firstname = attributes.pop('Firstname')
-        if 'Lastname' in attributes.keys():
-            p.Lastname = attributes.pop('Lastname')
-        if 'Occupation' in attributes.keys():
-            p.Occupation = attributes.pop('Occupation')
-        if any('birth' in str(x) for x in attributes.keys()):
-            e = Event()
-            try:
-                e.Date = attributes.pop('Date_of_birth')
-            except:
-                pass
-            try:
-                e.Time = attributes.pop('Time_of_birth')
-            except:
-                pass
-            try:
-                e.Location = attributes.pop('Place_of_birth')
-            except:
-                pass
-            p.birth = e
-        if 'death' in attributes.keys():
-            e = Event()
-            try:
-                e.Date = attributes.pop('Date_of_death')
-            except:
-                pass
-            try:
-                e.Time = attributes.pop('Time_of_death')
-            except:
-                pass
-            try:
-                e.Location = attributes.pop('Place_of_death')
-            except:
-                pass
-            p.Death = e
-        return p
+        """Rebuild a Person from a graph element map.
 
+        The original read-back was dead code in both directions: the birth guard tested for the
+        lowercase substring ``'birth'`` inside keys spelled ``Date_of_Birth``, and the death
+        guard tested for a key literally named ``death``, which nothing ever wrote. Birth and
+        death were therefore ``null`` in every response, for every person, always -- and the
+        client dereferenced both without a guard.
+        """
+        attributes = dict(attributes)
+        person = Person()
+        person.ID = attributes.pop(T.id, None)
 
-if __name__ == '__main__':
-    p = Person(Gender='Male', Lastname='Gundu', Alive=True)
-    print(list(p.__dict__.values()))
-    if None in list(p.__dict__.values()):
-        print('None')
+        for name in ('Gender', 'Alive', 'Firstname', 'Lastname', 'Occupation'):
+            if name in attributes:
+                setattr(person, name, attributes.pop(name))
+
+        for keys, setter in ((BIRTH_KEYS, 'Birth'), (DEATH_KEYS, 'Death')):
+            event = Event()
+            for attribute, property_name in keys.items():
+                if property_name in attributes:
+                    setattr(event, attribute, attributes.pop(property_name))
+            if not event.is_empty():
+                setattr(person, setter, event)
+
+        return person

@@ -1,0 +1,9 @@
+# Optional face-recognition extra. Kept out of requirements.txt on purpose: dlib is
+# distributed as a source archive and needs cmake plus a C++ toolchain, which makes the core
+# application uninstallable in one command if it is a hard dependency.
+#
+# dlib-bin ships prebuilt wheels and avoids the source compile.
+-r requirements.txt
+dlib-bin>=19.24,<20
+face-recognition>=1.3,<2
+numpy>=1.26,<2

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: pip install pytest ruff
+      - name: Lint
+        run: ruff check Tree wsgi.py TreeServer.py
+      - name: Guard against eval in request handling
+        # The single highest-severity defect in this codebase was eval() on request data.
+        # This gate is what stops it coming back.
+        run: python tools/check_no_eval.py
+      - name: Tests
+        run: pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # `npm ci` rather than `npm install`: it installs exactly the lockfile, which is the
+      # point of committing one. The previous frontend died of unpinned dependencies.
+      - run: npm ci
+        working-directory: web
+      - name: Typecheck and build
+        run: npm run build
+        working-directory: web
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t familytree-api:ci .
+      - name: Boot through the WSGI entrypoint and check /health
+        # This job alone would have caught most of the deployment defects: no module-level app
+        # object, CORS registered only under __main__, sys.exit(1) from the app factory, and
+        # CWD-relative file reads.
+        run: |
+          docker run -d --name api -p 5000:5000 \
+            -e ALLOW_UNAUTHENTICATED=1 \
+            -e INJECT_GROOVY_AT_STARTUP=0 \
+            familytree-api:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5000/health; then echo; echo "healthy"; exit 0; fi
+            sleep 2
+          done
+          echo "did not become healthy"; docker logs api; exit 1

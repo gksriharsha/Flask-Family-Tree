@@ -1,9 +1,21 @@
-from PIL import Image
-from Tree.config import Configuration
+"""Downscale an uploaded image in place."""
 
-def reduce(path):
-    fixed_height = Configuration.RESIZED_IMAGE_HEIGHT
-    raw_img = Image.open(path)
-    width = int(float(raw_img.size[0]) * float(fixed_height / float(raw_img.size[1])))
-    raw_img = raw_img.resize((width, fixed_height), Image.ANTIALIAS)
-    raw_img.save(path)
+from PIL import Image
+
+
+def reduce(path, fixed_height=800):
+    """Resize so the image is ``fixed_height`` tall, preserving aspect ratio.
+
+    ``Image.ANTIALIAS`` was removed in Pillow 10.0, so this raised AttributeError on the first
+    upload with any current Pillow -- which meant every image endpoint 500'd before reaching
+    any of its own logic.
+    """
+    with Image.open(path) as raw:
+        raw.load()
+        if raw.height == 0:
+            return
+        width = max(1, int(raw.width * (fixed_height / raw.height)))
+        resized = raw.resize((width, fixed_height), Image.Resampling.LANCZOS)
+        if resized.mode not in ('RGB', 'L'):
+            resized = resized.convert('RGB')
+        resized.save(path)

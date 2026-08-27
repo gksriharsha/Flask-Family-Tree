@@ -1,0 +1,256 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+Telugu:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --paper:#EFF1EA; --surface:#FAFBF7; --surface-2:#E7EBDE; --sunk:#E2E7D6;
+      --ink:#1A1E15; --ink-2:#3D4636; --muted:#6B7563; --rule:#D3D9C6; --rule-soft:#E3E7D8;
+      --olive:#3F6D14; --olive-soft:#E4EDD4; --olive-line:#7FA352;
+      --brown:#8F3F0A; --brown-soft:#F4E3D5;
+      --blue:#1261BB; --blue-soft:#DCE8F7;
+      --amber:#A45C0E; --amber-soft:#F9E8D4;
+      --serif:"Faustina","Iowan Old Style",Georgia,serif;
+      --sans:"Source Sans 3","Helvetica Neue",Arial,sans-serif;
+      --telugu:"Noto Serif Telugu","Faustina",serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+           font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { color:#0E4E96; text-decoration:underline; }
+    button { font-family:inherit; font-size:inherit; color:inherit; cursor:pointer; }
+    .lbl { font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+           color:var(--muted); margin:0 0 9px; }
+    .te { font-family:var(--telugu); }
+    .tnum { font-variant-numeric:tabular-nums; }
+  </style>
+  <style>
+    .app { display:grid; grid-template-columns:1fr 306px; height:1000px; }
+    .stage { background:#1E2118; position:relative; overflow:hidden;
+             display:grid; place-items:center; }
+    .photo { position:relative; width:700px; height:470px; border-radius:2px; overflow:hidden;
+             box-shadow:0 8px 28px rgba(0,0,0,.4); }
+    .cap { position:absolute; left:0; right:0; bottom:-30px; text-align:center; font-size:11.5px;
+           color:#9AA48D; }
+
+    .fbox { position:absolute; border:2px solid #F0D264; border-radius:2px;
+            background:rgba(240,210,100,.06); }
+    .fbox.me { border-color:#8FC55A; background:rgba(143,197,90,.08); }
+    .fbox.unk { border-color:#D9995C; border-style:dashed; background:rgba(217,153,92,.07); }
+    .fbox.sel { box-shadow:0 0 0 2px rgba(255,255,255,.55); }
+    .ftag { position:absolute; left:-2px; top:100%; margin-top:3px; white-space:nowrap;
+            background:#F0D264; color:#241E06; font-size:10.5px; font-weight:700;
+            padding:2px 5px; border-radius:2px; letter-spacing:.02em; }
+    .fbox.me .ftag { background:#8FC55A; color:#16240A; }
+    .fbox.unk .ftag { background:#D9995C; color:#2A1608; }
+    .ftag .kin { font-weight:600; opacity:.78; }
+    .ftag.tel { font-family:var(--telugu); font-weight:500; font-size:11.5px; }
+
+    .rail { background:var(--surface); border-left:1px solid var(--rule); overflow:auto; }
+    .rail-in { padding:18px 18px 26px; }
+    .sec + .sec { margin-top:20px; padding-top:18px; border-top:1px solid var(--rule-soft); }
+
+    .seg { display:flex; border:1px solid var(--rule); border-radius:3px; overflow:hidden;
+           background:var(--paper); }
+    .seg button { flex:1; border:none; background:none; height:29px; font-size:11.5px;
+                  font-weight:600; color:var(--muted); }
+    .seg button + button { border-left:1px solid var(--rule); }
+    .seg button.on { background:var(--blue); color:#fff; }
+    .seg button.te { font-family:var(--telugu); font-size:12.5px; }
+
+    .tag { display:flex; align-items:baseline; gap:9px; padding:7px 0; width:100%;
+           text-align:left; border:none; background:none; }
+    .tag + .tag { border-top:1px solid var(--rule-soft); }
+    .tag:hover { background:var(--olive-soft); }
+    .tag .n { width:17px; height:17px; flex:none; border-radius:2px; background:var(--sunk);
+              font-size:10px; font-weight:700; display:grid; place-items:center;
+              color:var(--ink-2); margin-top:2px; }
+    .tag.on .n { background:var(--olive); color:#fff; }
+    .tag .nm { display:block; font-family:var(--serif); font-size:13.5px; font-weight:600;
+               line-height:1.25; }
+    .tag .te2 { display:block; font-family:var(--telugu); font-size:12px; color:var(--muted); }
+    .tag .kv { display:block; font-size:12px; color:var(--olive); font-weight:600; margin-top:2px; }
+    .tag.q .nm { color:var(--brown); font-style:italic; font-weight:500; }
+
+    .ask { margin-top:12px; border:1px dashed var(--brown); border-radius:3px;
+           background:var(--brown-soft); padding:11px 12px; }
+    .ask h4 { margin:0 0 5px; font-size:11px; font-weight:700; letter-spacing:.07em;
+              text-transform:uppercase; color:var(--brown); }
+    .ask .inp { width:100%; height:31px; border:none; border-bottom:1px solid var(--brown);
+                background:transparent; font-family:inherit; font-size:13px; color:var(--ink); }
+    .ask .inp:focus { outline:none; border-bottom-width:2px; }
+    .ask p { margin:7px 0 0; font-size:11.5px; color:#5E2E07; line-height:1.5; }
+
+    .consent { margin-top:16px; background:var(--sunk); border-radius:3px; padding:11px 12px;
+               font-size:11.5px; color:var(--ink-2); line-height:1.55; }
+    .consent b { display:block; font-size:10px; font-weight:700; letter-spacing:.08em;
+                 text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+    .btn { width:100%; height:34px; border-radius:3px; border:1px solid var(--blue);
+           background:var(--blue); color:#fff; font-size:12.5px; font-weight:600;
+           display:grid; place-items:center; margin-top:14px; }
+    .btn:hover { background:#0E4E96; }
+  </style>
+</helmet>
+
+<div class="app">
+  <div class="stage">
+    <div class="photo">
+      <!-- placeholder for the uploaded photograph -->
+      <svg viewBox="0 0 700 470" width="700" height="470" aria-label="Group photograph placeholder">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#6E6A55"/><stop offset="1" stop-color="#4A4736"/>
+          </linearGradient>
+          <linearGradient id="fl" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#8A8368"/><stop offset="1" stop-color="#6B6551"/>
+          </linearGradient>
+        </defs>
+        <rect width="700" height="470" fill="url(#bg)"/>
+        <rect y="330" width="700" height="140" fill="url(#fl)"/>
+        <g fill="#3E3B2E" opacity=".55">
+          <rect x="40" y="60" width="180" height="230" rx="4"/>
+          <rect x="480" y="60" width="180" height="230" rx="4"/>
+        </g>
+        <!-- back row -->
+        <g fill="#9A9276">
+          <circle cx="150" cy="150" r="30"/><path d="M108 330c0-28 19-48 42-48s42 20 42 48z"/>
+          <circle cx="262" cy="140" r="31"/><path d="M219 330c0-29 19-50 43-50s43 21 43 50z"/>
+          <circle cx="380" cy="146" r="30"/><path d="M338 330c0-28 19-48 42-48s42 20 42 48z"/>
+          <circle cx="492" cy="142" r="31"/><path d="M449 330c0-29 19-50 43-50s43 21 43 50z"/>
+        </g>
+        <!-- front row, seated -->
+        <g fill="#B4AB8B">
+          <circle cx="212" cy="288" r="27"/><path d="M174 400c0-24 17-42 38-42s38 18 38 42z"/>
+          <circle cx="330" cy="292" r="26"/><path d="M293 400c0-23 17-40 37-40s37 17 37 40z"/>
+          <circle cx="446" cy="288" r="27"/><path d="M408 400c0-24 17-42 38-42s38 18 38 42z"/>
+        </g>
+        <rect width="700" height="470" fill="#C9A24A" opacity=".08"/>
+      </svg>
+
+      <sc-for list="{{faces}}" as="f" hint-placeholder-count="7">
+        <button class="fbox {{f.cls}}" style="{{f.pos}}" onClick="{{f.pick}}">
+          <span class="ftag {{f.tagCls}}">{{f.tag}}</span>
+        </button>
+      </sc-for>
+      <div class="cap">Family gathering, Vijayawada &middot; about 1998 &middot; 7 boxes drawn, 6 named</div>
+    </div>
+  </div>
+
+  <div class="rail">
+    <div class="rail-in">
+      <div class="sec">
+        <p class="lbl">Label faces as</p>
+        <div class="seg">
+          <button class="{{lang.enCls}}" aria-pressed="{{lang.enOn}}" onClick="{{lang.en}}">Names</button>
+          <button class="{{lang.kinCls}}" aria-pressed="{{lang.kinOn}}" onClick="{{lang.kin}}">Kin to you</button>
+          <button class="te {{lang.teCls}}" aria-pressed="{{lang.teOn}}" onClick="{{lang.te}}">తెలుగు</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.5">
+          Measured from you &mdash; Aditya Varun. Re-root the tree and every label here changes with it.
+        </div>
+      </div>
+
+      <div class="sec">
+        <p class="lbl">In this photograph</p>
+        <sc-for list="{{tags}}" as="t" hint-placeholder-count="7">
+          <button class="tag {{t.cls}}" onClick="{{t.pick}}">
+            <span class="n">{{t.i}}</span>
+            <span>
+              <span class="nm">{{t.name}}</span>
+              <span class="te2">{{t.te}}</span>
+              <span class="kv">{{t.kin}}</span>
+            </span>
+          </button>
+        </sc-for>
+
+        <div class="ask">
+          <h4>Face 7 &mdash; not named</h4>
+          <input class="inp" placeholder="Type a name to search the tree">
+          <p>Nothing is guessed. A face is only ever named by a person who recognises it.</p>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="consent">
+          <b>How faces are handled</b>
+          Boxes are drawn in your browser and never leave it as anything but coordinates. No
+          face measurement, template or embedding is computed or stored &mdash; only the box
+          someone drew and the name they chose, with a note of who tagged it and when.
+          Tagging a living relative needs their agreement first, and any tag can be removed
+          by the person in it.
+        </div>
+        <button class="btn">Save 6 tags</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"$preview":{"width":1100,"height":1000}}'>
+/* Faces sit at fixed positions over the placeholder photograph. Kinship strings are the
+   output of the same three-layer engine that drives the tree: EN and TE are separate
+   renderings of one struct, not translations of each other. */
+const FACES = [
+  {i:1, x:120, y:120, w:62, h:74, name:'Eshwar Datta Varma',       te:'ఈశ్వర్ దత్త వర్మ',    en:'Paternal grandfather',      tel:'తాత',           me:false},
+  {i:2, x:232, y:110, w:62, h:74, name:'Girija Sharma',        te:'గిరిజ శర్మ',       en:'Paternal grandmother',      tel:'నానమ్మ',        me:false},
+  {i:3, x:350, y:116, w:62, h:74, name:'Harinath Sharma',     te:'హరినాథ్ శర్మ',   en:'Father’s elder brother',    tel:'పెద్దనాన్న',    me:false},
+  {i:4, x:462, y:112, w:62, h:74, name:'Chandra Mohan Babu',     te:'చంద్ర మోహన్ బాబు',   en:'Father',                    tel:'నాన్న',         me:false},
+  {i:5, x:184, y:262, w:56, h:66, name:'Aditya Varun Varma',    te:'ఆదిత్య వరుణ్ వర్మ',  en:'You',                       tel:'నేను',          me:true},
+  {i:6, x:302, y:266, w:56, h:66, name:'Lokesh Sharma',         te:'లోకేష్ శర్మ',       en:'First cousin',              tel:'తమ్ముడు',       me:false},
+  {i:7, x:418, y:262, w:56, h:66, name:'',                           te:'',                       en:'',                          tel:'',              me:false, unknown:true}
+];
+
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = {mode:'kin', sel:6}; }
+
+  renderVals() {
+    const st = this.state;
+    const label = (f) => {
+      if (f.unknown) return 'Who is this?';
+      if (st.mode === 'en') return f.name;
+      if (st.mode === 'te') return f.tel;
+      return f.me ? 'You' : f.en;
+    };
+    const setMode = (v) => () => this.setState({mode:v});
+
+    return {
+      lang: {
+        en: setMode('en'), kin: setMode('kin'), te: setMode('te'),
+        enCls: st.mode === 'en' ? 'on' : '', kinCls: st.mode === 'kin' ? 'on' : '',
+        teCls: st.mode === 'te' ? 'on' : '',
+        enOn: st.mode === 'en', kinOn: st.mode === 'kin', teOn: st.mode === 'te'
+      },
+      faces: FACES.map((f) => {
+        const cls = [];
+        if (f.me) cls.push('me');
+        if (f.unknown) cls.push('unk');
+        if (st.sel === f.i) cls.push('sel');
+        return {
+          pos: 'left:' + f.x + 'px; top:' + f.y + 'px; width:' + f.w + 'px; height:' + f.h + 'px;',
+          cls: cls.join(' '),
+          tag: label(f),
+          tagCls: st.mode === 'te' && !f.unknown ? 'tel' : '',
+          pick: () => this.setState({sel: f.i})
+        };
+      }),
+      tags: FACES.map((f) => ({
+        i: String(f.i),
+        name: f.unknown ? 'Not named yet' : f.name,
+        te: f.unknown ? '' : f.te,
+        kin: f.unknown ? '' : (f.me ? 'you' : f.en + '  ·  ' + f.tel),
+        cls: (st.sel === f.i ? 'on ' : '') + (f.unknown ? 'q' : ''),
+        pick: () => this.setState({sel: f.i})
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,3 +1,27 @@
 /venv*/
-*.xml
-*cpython*
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Runtime data: uploads and the face-encoding store.
+/data/
+
+# Local configuration and secrets.
+.env
+
+# Frontend dependencies and build output. The lockfile IS committed — reproducibility is the
+# whole point of having one — but the tree it installs is not, and dist is produced by the
+# Docker build rather than checked in.
+node_modules/
+/web/dist/
+
+# The published design canvas: a 2 MB artifact generated from the .dc.html artboards and
+# canvas.json, which are the actual source and are committed.
+/design/family-tree-ui.html
+
+# IDE files. These were previously committed; the '*.xml' rule that used to be here was
+# hiding half of them while .idea/Flask-Family-Tree.iml stayed tracked.
+.idea/
+.vscode/
