@@ -264,3 +264,108 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .counts { display: none; }
   .canvas-in { padding: 20px 16px 40px; }
 }
+
+/* ── the add/edit sheet ─────────────────────────────────────────────────────────
+   A sheet rather than a route, because adding a relative is nearly always done while
+   looking at somebody — losing the tree behind a full-page form is what makes people
+   enter a placeholder instead of going back to check. */
+.sheet {
+  position: fixed; inset: 0; z-index: 40;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 32px 16px; overflow-y: auto;
+  background: rgb(26 30 21 / 38%);
+}
+.sheet-in {
+  width: 100%; max-width: 680px;
+  background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 5px;
+  box-shadow: 0 18px 48px rgb(26 30 21 / 22%);
+  padding: 22px 24px 18px;
+}
+.sheet-top { display: flex; align-items: center; gap: 12px; }
+.sheet-top h2 { margin: 0; font-family: var(--serif); font-size: 21px; font-weight: 600; }
+.sheet-top .x {
+  margin-left: auto; width: 30px; height: 30px; line-height: 1;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--surface); color: var(--muted); font-size: 19px;
+}
+.sheet .lede { margin: 8px 0 18px; color: var(--ink-2); font-size: 13.5px; max-width: 56ch; }
+
+.dategroup {
+  margin: 0 0 14px; padding: 12px 14px 13px;
+  border: 1px solid var(--rule-soft); border-radius: 4px; background: var(--paper);
+}
+.dategroup legend {
+  padding: 0 6px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+
+/* Variant classes carry an is- prefix so a modifier can never also match a block of the
+   same name — .yr as a bare variant would collide with any future .yr block. */
+.modes { display: flex; flex-wrap: wrap; gap: 6px; }
+.modes button {
+  height: 29px; padding: 0 11px;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--surface); color: var(--ink-2);
+  font-size: 12.5px; font-weight: 600;
+}
+.modes button[aria-pressed='true'] {
+  border-color: var(--olive-line); background: var(--olive-soft); color: var(--olive);
+}
+
+.daterow { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 11px; }
+.fld { display: flex; flex-direction: column; gap: 4px; }
+.fld > span { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.fld input, .fld select {
+  height: 32px; padding: 0 9px;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 14px;
+}
+.fld.is-grow { flex: 1 1 210px; }
+.fld.is-yr { width: 108px; }
+.fld.is-sm { width: 84px; }
+.andword { padding-bottom: 8px; color: var(--muted); font-size: 13px; }
+
+.dategroup .nothing { margin: 10px 0 0; color: var(--muted); font-size: 12.5px; max-width: 60ch; }
+
+/* The live read-back. Showing what the record will actually say is what stops somebody
+   entering an exact date they do not have. */
+.preview {
+  margin-top: 12px; padding: 9px 11px;
+  border-left: 2px solid var(--olive-line); background: var(--olive-soft); border-radius: 0 3px 3px 0;
+}
+.preview .pv { font-size: 13.5px; color: var(--ink); }
+.preview .pv strong { font-family: var(--serif); font-size: 15px; }
+.preview .pm { margin-top: 3px; font-size: 12px; color: var(--ink-2); }
+
+.linklist { margin: 8px 0 0; padding: 0; list-style: none; }
+.linklist li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--rule-soft); font-size: 13.5px;
+}
+.linklist li:last-child { border-bottom: 0; }
+.linklist li span { flex: 1; }
+.linklist li em { color: var(--brown); font-style: normal; font-size: 12px; }
+.linklist li button {
+  height: 26px; padding: 0 10px;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--surface); color: var(--muted); font-size: 12px;
+}
+.linklist li button:hover { border-color: var(--brown); color: var(--brown); }
+
+.sheet-foot {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule);
+}
+.sheet-foot .spacer { flex: 1; }
+.sheet-foot .delwarn { flex: 1 1 100%; color: var(--brown); font-size: 12.5px; }
+.btn.wide { width: 100%; }
+.btn.danger { border-color: var(--brown); background: var(--brown); }
+.btn.danger-text { color: var(--brown); border-color: var(--rule); }
+.sheet .err { margin: 4px 0 0; color: var(--brown); font-size: 13px; }
+
+@media (max-width: 720px) {
+  .sheet { padding: 0; }
+  .sheet-in { max-width: none; min-height: 100%; border: 0; border-radius: 0; }
+}

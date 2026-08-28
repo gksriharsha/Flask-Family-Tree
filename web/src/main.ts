@@ -2,6 +2,8 @@ import './styles.css';
 import type { ExportFormat } from './api';
 import { ApiError, api, loadToken, setToken } from './api';
 import { person, state } from './state';
+import type { DateDraft, PersonDraft } from './views/personform';
+import { blankDraft, draftFrom, reads, renderPersonForm, sorts } from './views/personform';
 import { renderRail } from './views/rail';
 import { renderTree } from './views/tree';
 
@@ -51,6 +53,10 @@ function leftRail(): string {
           <div class="nm">${escape(rootPerson?.name ?? '—')}</div>
           <div class="sub">${counts ? `${counts.people} people · ${counts.unions} unions` : ''}</div>
         </div>
+      </div>
+
+      <div class="rail-sec">
+        <button class="btn wide" data-addperson>Add a person</button>
       </div>
 
       <div class="rail-sec">
@@ -197,7 +203,119 @@ function render(): void {
         <main>${renderTree()}</main>
         <aside class="rail rail-r">${renderRail()}</aside>
       </div>
-    </div>`;
+    </div>
+    ${state.editor ? renderPersonForm(state.editor) : ''}`;
+
+  // Typing is not allowed to trigger a re-render, so the caret is only ever restored here --
+  // after a toggle rebuilt the sheet -- rather than on every keystroke.
+  if (state.editor) {
+    const first = root.querySelector<HTMLInputElement>('.sheet [data-df="given"]');
+    if (first && document.activeElement === document.body) first.focus();
+  }
+}
+
+/* ── the add/edit sheet ────────────────────────────────────────────────────── */
+/**
+ * Copy what has been typed back into the draft before any re-render.
+ *
+ * The whole interface re-renders from state, so without this a toggle -- switching the date
+ * mode, say -- would discard every field the reader had already filled in.
+ */
+function syncDraft(): void {
+  const draft = state.editor;
+  if (!draft) return;
+  root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('.sheet [data-df]').forEach((el) => {
+    const key = el.dataset.df!;
+    const value = el.value;
+    if (key === 'attachId') {
+      draft.attachId = value === '' ? null : Number(value);
+      return;
+    }
+    if (key.includes('.')) {
+      const [which, field] = key.split('.') as ['birth' | 'death', keyof DateDraft];
+      (draft[which][field] as string) = value;
+      return;
+    }
+    (draft as unknown as Record<string, string>)[key] = value;
+  });
+}
+
+/**
+ * Update the read-back in place as the year is typed.
+ *
+ * Deliberately not a re-render: rebuilding the sheet on every keystroke would move the caret
+ * and lose the field. Only the two preview lines are touched, so the form stays exactly where
+ * the reader left it while still showing what the record is about to say.
+ */
+function refreshPreview(): void {
+  const draft = state.editor;
+  if (!draft) return;
+  for (const which of ['birth', 'death'] as const) {
+    const box = root.querySelector(`.sheet [data-preview="${which}"]`);
+    if (!box) continue;
+    const value = box.querySelector('.pv strong');
+    const note = box.querySelector('.pm');
+    if (value) value.textContent = reads(draft[which]);
+    if (note) note.textContent = sorts(draft[which]);
+  }
+}
+
+function openEditor(draft: PersonDraft): void {
+  state.editor = draft;
+  state.error = null;
+  render();
+}
+
+/** A draft field as the API wants it: absent stays absent rather than becoming zero. */
+function dateInput(d: DateDraft) {
+  const number = (value: string) => (value.trim() === '' ? null : Number(value));
+  return {
+    mode: d.mode,
+    year: number(d.year),
+    month: number(d.month),
+    day: number(d.day),
+    year2: number(d.year2),
+  };
+}
+
+async function saveDraft(andAnother: boolean): Promise<void> {
+  syncDraft();
+  const draft = state.editor;
+  if (!draft) return;
+  if (!draft.given.trim()) {
+    state.error = 'A person needs a given name.';
+    render();
+    return;
+  }
+
+  const payload = {
+    given: draft.given.trim(),
+    surname: draft.surname.trim(),
+    sex: draft.sex,
+    living: draft.living === 'unknown' ? null : draft.living === 'yes',
+    birth: dateInput(draft.birth),
+    // A death date on somebody recorded as living would contradict itself, so it is only
+    // ever sent when the form is actually showing the field.
+    death: draft.living === 'no' ? dateInput(draft.death) : { mode: 'unknown' as const },
+  };
+
+  await guard(async () => {
+    if (draft.id !== null) {
+      await api.editPerson(draft.id, payload);
+      state.editor = null;
+    } else {
+      const attachTo = draft.attachId === null
+        ? undefined
+        : { personId: draft.attachId, relation: draft.attachRelation, role: draft.attachRole };
+      const created = await api.addPerson({ ...payload, attachTo });
+      state.editor = andAnother
+        ? blankDraft(draft.attachId)
+        : null;
+      if (!andAnother) state.selected = created.Person.id;
+    }
+    state.error = null;
+    await reload();
+  });
 }
 
 /* ── events ────────────────────────────────────────────────────────────────── */
@@ -216,6 +334,119 @@ function closest(target: EventTarget | null, attr: string): HTMLElement | null {
 
 root.addEventListener('click', (event) => {
   const t = event.target;
+
+  /* ── the add/edit sheet ──────────────────────────────────────────────────── */
+  const addPerson = closest(t, 'data-addperson');
+  if (addPerson) {
+    const near = addPerson.dataset.addperson;
+    openEditor(blankDraft(near ? Number(near) : null));
+    return;
+  }
+
+  const editPerson = closest(t, 'data-editperson');
+  if (editPerson) {
+    const target = person(Number(editPerson.dataset.editperson));
+    if (target) openEditor(draftFrom(target));
+    return;
+  }
+
+  if (closest(t, 'data-cancelperson')) {
+    state.editor = null;
+    state.error = null;
+    render();
+    return;
+  }
+
+  const dateMode = closest(t, 'data-dm');
+  if (dateMode && state.editor) {
+    syncDraft();
+    const [which, mode] = dateMode.dataset.dm!.split(':') as ['birth' | 'death', DateDraft['mode']];
+    state.editor[which].mode = mode;
+    render();
+    return;
+  }
+
+  const sexButton = closest(t, 'data-sx');
+  if (sexButton && state.editor) {
+    syncDraft();
+    state.editor.sex = sexButton.dataset.sx as typeof state.editor.sex;
+    render();
+    return;
+  }
+
+  const livingButton = closest(t, 'data-lv');
+  if (livingButton && state.editor) {
+    syncDraft();
+    state.editor.living = livingButton.dataset.lv as typeof state.editor.living;
+    render();
+    return;
+  }
+
+  const attachRelation = closest(t, 'data-ar');
+  if (attachRelation && state.editor) {
+    syncDraft();
+    state.editor.attachRelation = attachRelation.dataset.ar as 'parent' | 'child' | 'spouse';
+    render();
+    return;
+  }
+
+  const attachRole = closest(t, 'data-arole');
+  if (attachRole && state.editor) {
+    syncDraft();
+    state.editor.attachRole = attachRole.dataset.arole as 'biological' | 'adoptive';
+    render();
+    return;
+  }
+
+  const save = closest(t, 'data-saveperson');
+  if (save) {
+    void saveDraft(save.dataset.saveperson === 'again');
+    return;
+  }
+
+  if (closest(t, 'data-confirmdelete') && state.editor) {
+    syncDraft();
+    state.editor.confirmingDelete = true;
+    render();
+    return;
+  }
+  if (closest(t, 'data-canceldelete') && state.editor) {
+    state.editor.confirmingDelete = false;
+    render();
+    return;
+  }
+  const doDelete = closest(t, 'data-deleteperson');
+  if (doDelete && state.editor?.id !== null && state.editor !== null) {
+    const id = state.editor.id;
+    void guard(async () => {
+      await api.removePerson(id);
+      state.editor = null;
+      if (state.selected === id) state.selected = null;
+      if (state.root === id) state.root = null;
+      await reload();
+    });
+    return;
+  }
+
+  const unlinkParent = closest(t, 'data-unlinkparent');
+  if (unlinkParent) {
+    const [childId, parentId] = unlinkParent.dataset.unlinkparent!.split(':').map(Number);
+    void guard(async () => {
+      await api.unlinkParent(childId!, parentId!);
+      await reload();
+    });
+    return;
+  }
+
+  const unlinkUnion = closest(t, 'data-unlinkunion');
+  if (unlinkUnion) {
+    const [aId, bId] = unlinkUnion.dataset.unlinkunion!.split(':').map(Number);
+    void guard(async () => {
+      await api.unlinkUnion(aId!, bId!);
+      await reload();
+    });
+    return;
+  }
 
   const signIn = closest(t, 'data-signin');
   if (signIn) {
@@ -360,6 +591,17 @@ root.addEventListener('click', (event) => {
 let searchTimer: number | undefined;
 root.addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement;
+
+  if (state.editor && input.dataset.df) {
+    syncDraft();
+    // Choosing somebody to attach to reveals the relation and role choices, so that one field
+    // needs a real re-render. Every other field only moves the read-back, which is patched in
+    // place so the caret stays where it is.
+    if (input.dataset.df === 'attachId') render();
+    else refreshPreview();
+    return;
+  }
+
   if (input.id !== 'search') return;
   state.search = input.value;
   window.clearTimeout(searchTimer);
@@ -376,6 +618,14 @@ root.addEventListener('input', (event) => {
       (document.getElementById('search') as HTMLInputElement | null)?.focus();
     });
   }, 220);
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && state.editor) {
+    state.editor = null;
+    state.error = null;
+    render();
+  }
 });
 
 /* ── boot ──────────────────────────────────────────────────────────────────── */

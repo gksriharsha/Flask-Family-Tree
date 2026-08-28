@@ -1,9 +1,24 @@
 import type { PersonNode, Relationship } from '../api';
-import { person, state, years } from '../state';
+import { person, state } from '../state';
 
 const escape = (text: string): string =>
   text.replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/**
+ * Dates at the precision they were actually recorded.
+ *
+ * `years()` renders a bare `b. 1955`, which reads as a fact even when the record only said
+ * "about". Showing the real wording is the whole reason the seven precisions exist.
+ */
+function dates(p: PersonNode): string {
+  const born = p.birth.mode === 'unknown' ? null : p.birth.reads;
+  const died = p.death.mode === 'unknown' ? null : p.death.reads;
+  if (born === null && died === null) return 'no dates recorded';
+  if (died === null) return `b. ${born}`;
+  if (born === null) return `d. ${died}`;
+  return `${born} – ${died}`;
+}
 
 function relationshipBox(p: PersonNode, link: Relationship, index: number): string {
   const alternatives = link.alternatives.length > 0
@@ -99,7 +114,7 @@ export function renderRail(): string {
     <div class="rail-in">
       <p class="lbl">Selected</p>
       <div class="selname">${escape(p.name)}</div>
-      <div class="selmeta">${escape(years(p))} · ${escape(p.sex)}</div>
+      <div class="selmeta">${escape(dates(p))} · ${escape(p.sex)}</div>
 
       <p class="lbl" style="margin-top:16px">${escape(heading)}</p>
       ${p.relationships.map((link, i) => relationshipBox(p, link, i)).join('')}
@@ -109,6 +124,8 @@ export function renderRail(): string {
 
       <div class="acts">
         <button class="btn ghost" data-reroot="${p.id}">Measure from here</button>
+        <button class="btn ghost" data-editperson="${p.id}">Edit</button>
+        <button class="btn ghost" data-addperson="${p.id}">Add a relative</button>
       </div>
     </div>`;
 }

@@ -1,4 +1,5 @@
 import type { GraphResponse, PersonNode, Side, TreeInfo } from './api';
+import type { PersonDraft } from './views/personform';
 
 export type Lang = 'en' | 'te' | 'both';
 
@@ -18,6 +19,8 @@ export interface AppState {
   /** Branches the reader has opened. The root's own line is always open. */
   open: Set<number>;
   addingWord: boolean;
+  /** The add/edit sheet, or null when it is closed. */
+  editor: PersonDraft | null;
   search: string;
   searchResults: { ID: number; Firstname: string; Lastname?: string }[];
 }
@@ -36,6 +39,7 @@ export const state: AppState = {
   lang: 'both',
   open: new Set(),
   addingWord: false,
+  editor: null,
   search: '',
   searchResults: [],
 };
