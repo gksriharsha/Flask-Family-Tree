@@ -8,7 +8,7 @@ relationships as structs and leaves naming until last.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from Tree.kinship.model import FEMALE, MALE, Kinship
 
@@ -28,6 +28,21 @@ def _greats(n: int) -> str:
     return 'Great-' * n if n > 0 else ''
 
 
+def _by_sex(sex: str | None, male: str, female: str, neutral: str) -> str:
+    """Pick a term by sex, with a real answer when the sex is not recorded.
+
+    English has no single word for several of these, so the neutral form is descriptive
+    ("sibling's child" rather than "nephew"). That is deliberate: the alternative is what this
+    replaced, `'Nephew' if male else 'Niece'`, which quietly asserted "niece" about every
+    person whose sex nobody had written down.
+    """
+    if sex == MALE:
+        return male
+    if sex == FEMALE:
+        return female
+    return neutral
+
+
 # ── English ─────────────────────────────────────────────────────────────────────
 def render_english(k: Kinship) -> str:
     """English never needs a birth order, so a missing one costs it nothing: it falls back
@@ -37,48 +52,51 @@ def render_english(k: Kinship) -> str:
     if k.kind == 'none':
         return 'No recorded blood relation'
 
-    male = k.sex == MALE
     adopt = ' (adoptive)' if k.adoptive else ''
 
     if k.kind == 'affinal':
         if k.via is None or k.via.kind == 'self':
-            return 'Husband' if k.via_sex == MALE else 'Wife'
-        suffix = '’s husband' if k.via_sex == MALE else '’s wife'
+            return _by_sex(k.via_sex, 'Husband', 'Wife', 'Spouse')
+        suffix = _by_sex(k.via_sex, '’s husband', '’s wife', '’s spouse')
         return render_english(k.via) + suffix
 
     if k.kind == 'ancestor':
         if k.depth == 1:
-            return ('Father' if male else 'Mother') + adopt
+            return _by_sex(k.sex, 'Father', 'Mother', 'Parent') + adopt
         if k.depth == 2:
             side = 'Paternal ' if k.side == 'paternal' else 'Maternal '
-            return side + ('grandfather' if male else 'grandmother') + adopt
-        return _greats(k.depth - 2) + ('grandfather' if male else 'grandmother') + adopt
+            return side + _by_sex(k.sex, 'grandfather', 'grandmother', 'grandparent') + adopt
+        return (_greats(k.depth - 2)
+                + _by_sex(k.sex, 'grandfather', 'grandmother', 'grandparent') + adopt)
 
     if k.kind == 'descendant':
         if k.depth == 1:
-            return ('Son' if male else 'Daughter') + adopt
+            return _by_sex(k.sex, 'Son', 'Daughter', 'Child') + adopt
         if k.depth == 2:
-            return ('Grandson' if male else 'Granddaughter') + adopt
-        return _greats(k.depth - 2) + ('grandson' if male else 'granddaughter') + adopt
+            return _by_sex(k.sex, 'Grandson', 'Granddaughter', 'Grandchild') + adopt
+        return (_greats(k.depth - 2)
+                + _by_sex(k.sex, 'grandson', 'granddaughter', 'grandchild') + adopt)
 
     if k.kind == 'sibling':
-        noun = 'brother' if male else 'sister'
+        noun = _by_sex(k.sex, 'brother', 'sister', 'sibling')
         if k.elder is None:
             return noun.capitalize() + adopt
         return ('Elder ' if k.elder else 'Younger ') + noun + adopt
 
     if k.kind == 'parent_sibling':
         if k.generations_up > 0:
-            return _greats(k.generations_up - 1) + ('Granduncle' if male else 'Grandaunt') + adopt
-        parent = 'Father' if k.link_sex == MALE else 'Mother'
+            return (_greats(k.generations_up - 1)
+                    + _by_sex(k.sex, 'Granduncle', 'Grandaunt', 'Grandparent’s sibling') + adopt)
+        parent = _by_sex(k.link_sex, 'Father', 'Mother', 'Parent')
         rank = '' if k.elder is None else ('elder ' if k.elder else 'younger ')
-        return f'{parent}’s {rank}' + ('brother' if male else 'sister') + adopt
+        return (f'{parent}’s {rank}'
+                + _by_sex(k.sex, 'brother', 'sister', 'sibling') + adopt)
 
     if k.kind == 'niblings':
         if k.generations_down > 0:
-            base = 'Grandnephew' if male else 'Grandniece'
+            base = _by_sex(k.sex, 'Grandnephew', 'Grandniece', 'Sibling’s grandchild')
             return _greats(k.generations_down - 1) + base + adopt
-        return ('Nephew' if male else 'Niece') + adopt
+        return _by_sex(k.sex, 'Nephew', 'Niece', 'Sibling’s child') + adopt
 
     if k.kind == 'cousin':
         label = f'{_ordinal(k.degree)} cousin'
@@ -112,9 +130,11 @@ def explain(k: Kinship) -> str:
     if k.kind == 'sibling':
         bits.append('you share a parent')
     if k.kind == 'parent_sibling':
-        bits.append('sibling of your ' + ('father' if k.link_sex == MALE else 'mother'))
+        bits.append('sibling of your '
+                    + _by_sex(k.link_sex, 'father', 'mother', 'parent'))
     if k.kind == 'niblings':
-        bits.append('child of your ' + ('brother' if k.link_sex == MALE else 'sister'))
+        bits.append('child of your '
+                    + _by_sex(k.link_sex, 'brother', 'sister', 'sibling'))
     if k.kind == 'cousin':
         bits.append(f'common ancestor {k.degree + 1} generations up')
         bits.append('parallel cousin — the two linking parents are the same sex, which is '
@@ -164,11 +184,33 @@ def _pair(t1: str, r1: str, t2: str, r2: str, gloss: str) -> Term:
                 unresolved=True, bases=(t1, t2))
 
 
+#: Kinds whose Telugu term depends on the sex of the person being named. 'self', 'none' and
+#: 'affinal' are excluded: the first two carry no sex, and affinal already selects on the sex
+#: of the person married in, which is a separate field.
+_SEXED_KINDS = frozenset({'ancestor', 'descendant', 'sibling', 'parent_sibling',
+                          'niblings', 'cousin'})
+
+
 def render_telugu(k: Kinship) -> Term:
     if k.kind == 'self':
         return _t('నేను', 'Nenu', 'me')
     if k.kind == 'none':
         return _t('—', '', 'no recorded relation')
+
+    # Telugu has no neutral word for most of these, and picking one anyway is what the old
+    # `if male else` chains did -- quietly calling every person of unrecorded sex a daughter,
+    # a mother, a sister. Show both instead and mark it unresolved, exactly as an unknown
+    # birth order is shown. The interface already renders that state as "needs a fact".
+    if k.sex not in (MALE, FEMALE) and k.kind in _SEXED_KINDS:
+        as_male = render_telugu(replace(k, sex=MALE))
+        as_female = render_telugu(replace(k, sex=FEMALE))
+        if as_male.text == as_female.text:
+            return as_male
+        return Term(text=f'{as_male.text} / {as_female.text}',
+                    roman=f'{as_male.roman} / {as_female.roman}',
+                    gloss='sex not recorded',
+                    unresolved=True,
+                    bases=(*as_male.bases, *as_female.bases))
 
     male = k.sex == MALE
 
