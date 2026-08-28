@@ -11,6 +11,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 
+from Tree.kinship.dates import UNKNOWN_DATE, DateValue
+from Tree.kinship.dates import compare as compare_dates
+
 MALE = 'male'
 FEMALE = 'female'
 INTERSEX = 'intersex'
@@ -28,6 +31,15 @@ NON_BIRTH_ROLES = frozenset({ADOPTIVE, STEP, FOSTER, GUARDIAN})
 
 @dataclass(frozen=True)
 class Person:
+    """One person, with dates that are allowed to be uncertain.
+
+    ``birth`` and ``death`` carry the full recorded precision -- exact day, year only, about,
+    before, after, or a bounded range. ``birth_year``/``death_year`` remain as the plain-year
+    view, because a great deal of code only ever wants a number to show, and because a graph
+    that predates the interval model still loads. Pass either; whichever is given wins, and
+    a bare year is read as "some time in that year" rather than as a specific day.
+    """
+
     id: int
     given: str
     surname: str = ''
@@ -35,10 +47,34 @@ class Person:
     #: None is the normal case, not an edge case: most records carry no usable birth date.
     birth_year: int | None = None
     death_year: int | None = None
+    birth: DateValue | None = None
+    death: DateValue | None = None
+    living: bool | None = None
+
+    def __post_init__(self) -> None:
+        # Keep the interval and the plain year agreeing, whichever one the caller supplied.
+        # They are two views of one fact, and letting them drift produces the worst kind of
+        # bug: a person whose age is right on one screen and blank on the next.
+        for interval_field, year_field in (('birth', 'birth_year'), ('death', 'death_year')):
+            interval = getattr(self, interval_field)
+            year = getattr(self, year_field)
+            if interval is not None and year is None:
+                object.__setattr__(self, year_field, interval.sort_year)
+            elif interval is None and year is not None:
+                object.__setattr__(self, interval_field, DateValue('year', year=year))
 
     @property
     def full_name(self) -> str:
         return f'{self.given} {self.surname}'.strip()
+
+    @property
+    def birth_date(self) -> DateValue:
+        """The birth as an interval, however it was supplied."""
+        return self.birth or UNKNOWN_DATE
+
+    @property
+    def death_date(self) -> DateValue:
+        return self.death or UNKNOWN_DATE
 
 
 @dataclass(frozen=True)
@@ -135,8 +171,8 @@ class FamilyGraph:
         # Unknown birth years sort last, in a stable order, rather than by a number
         # that does not exist.
         return sorted(found, key=lambda cid: (
-            self.people[cid].birth_year is None,
-            self.people[cid].birth_year or 0,
+            self.people[cid].birth_date.sort_year is None,
+            self.people[cid].birth_date.sort_year or 0,
             cid,
         ))
 
@@ -162,11 +198,15 @@ class FamilyGraph:
         answer = self.birth_order.get(_pair(x, y))
         if answer is not None:
             return answer == y
-        bx = self.people[x].birth_year if x in self.people else None
-        by = self.people[y].birth_year if y in self.people else None
-        if bx is None or by is None or bx == by:
+        if x not in self.people or y not in self.people:
             return None
-        return by < bx
+        # Dates settle it only when the two intervals do not overlap. "About 1955" and
+        # "about 1956" overlap, so neither is provably elder and the honest answer is None --
+        # which is what makes the interface ask instead of guessing.
+        order = compare_dates(self.people[y].birth_date, self.people[x].birth_date)
+        if order is None:
+            return None
+        return order < 0
 
     def __contains__(self, person_id: object) -> bool:
         return person_id in self.people
