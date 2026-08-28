@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from Tree.kinship.dates import UNKNOWN_DATE, DateValue
+
 VERSION_7 = '7.0'
 VERSION_551 = '5.5.1'
 
@@ -49,8 +51,10 @@ class Individual:
     given: str = ''
     surname: str = ''
     sex: str = 'unknown'
-    birth_year: int | None = None
-    death_year: int | None = None
+    #: The recorded precision, which GEDCOM expresses natively (ABT, BEF, AFT, BET/AND).
+    #: Writing a bare year where the record said "about" would be inventing precision.
+    birth: DateValue = UNKNOWN_DATE
+    death: DateValue = UNKNOWN_DATE
     #: (family xref, pedigree) — a person can belong to more than one, which is exactly
     #: how a within-family adoption is represented.
     child_of: list[tuple[str, str]] = field(default_factory=list)

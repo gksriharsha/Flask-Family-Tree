@@ -26,7 +26,13 @@ from Tree.gedcom.mapping import parse, to_document
 from Tree.gedcom.model import VERSION_7, VERSION_551, MediaObject
 from Tree.gedcom.writer import write_gedcom, write_gedzip
 from Tree.kinship.model import FEMALE, MALE, FamilyGraph
-from Tree.kinship.store import ELDER_THAN, load_family_graph, load_vocabulary
+from Tree.kinship.store import (
+    CHILD_LABEL,
+    ELDER_THAN,
+    PARENT_LABEL,
+    load_family_graph,
+    load_vocabulary,
+)
 from Tree.kinship.vocabulary import MATERNAL, PATERNAL
 
 log = logging.getLogger(__name__)
@@ -195,10 +201,8 @@ def export_as(g, version: str, settings: TreeSettings | None = None) -> Path:
 
 
 # ── reading a file back in ──────────────────────────────────────────────────────
-PARENT_LABEL = {(MALE, False): 'Father_Of', (FEMALE, False): 'Mother_Of',
-                (MALE, True): 'Father_Of*', (FEMALE, True): 'Mother_Of*'}
-CHILD_LABEL = {(MALE, False): 'Son_Of', (FEMALE, False): 'Daughter_Of',
-               (MALE, True): 'Son_Of*', (FEMALE, True): 'Daughter_Of*'}
+# The label maps live with the graph reader, so the importer and the interactive write
+# path cannot drift apart on how a link is spelled.
 
 
 def write_family_graph(g, family: FamilyGraph) -> dict[int, int]:
@@ -211,10 +215,13 @@ def write_family_graph(g, family: FamilyGraph) -> dict[int, int]:
         gender = {MALE: 'Male', FEMALE: 'Female'}.get(person.sex)
         if gender:
             traversal = traversal.property('Gender', gender)
-        if person.birth_year is not None:
-            traversal = traversal.property('Date_of_birth', f'{person.birth_year}-01-01')
-        if person.death_year is not None:
-            traversal = traversal.property('Date_of_death', f'{person.death_year}-01-01')
+        # Stored in GEDCOM date syntax at whatever precision the file gave. The previous code
+        # wrote `{year}-01-01`, which turned every "about 1955" into a specific January day
+        # that no document ever claimed.
+        if person.birth_date.is_known:
+            traversal = traversal.property('Date_of_birth', person.birth_date.gedcom())
+        if person.death_date.is_known:
+            traversal = traversal.property('Date_of_death', person.death_date.gedcom())
         created[person.id] = traversal.next().id
 
     for child_id, links in family.parents.items():
@@ -224,20 +231,23 @@ def write_family_graph(g, family: FamilyGraph) -> dict[int, int]:
             parent = family.people[link.parent_id]
             adoptive = not link.is_birth
             child = family.people[child_id]
-            parent_label = PARENT_LABEL.get((parent.sex, adoptive))
-            child_label = CHILD_LABEL.get((child.sex, adoptive))
-            if parent_label:
-                (g.V(created[link.parent_id]).addE(parent_label)
-                 .to(__.V(created[child_id])).iterate())
-            if child_label:
-                (g.V(created[child_id]).addE(child_label)
-                 .to(__.V(created[link.parent_id])).iterate())
+            # Falls back to the sex-neutral label rather than dropping the link, so a
+            # parent whose sex the file never recorded still connects to their child.
+            parent_label = PARENT_LABEL.get((parent.sex, adoptive),
+                                            'Parent_Of*' if adoptive else 'Parent_Of')
+            child_label = CHILD_LABEL.get((child.sex, adoptive),
+                                          'Child_Of*' if adoptive else 'Child_Of')
+            (g.V(created[link.parent_id]).addE(parent_label)
+             .to(__.V(created[child_id])).iterate())
+            (g.V(created[child_id]).addE(child_label)
+             .to(__.V(created[link.parent_id])).iterate())
 
     for union in family.unions:
         if union.a_id not in created or union.b_id not in created:
             continue
         for one, other in ((union.a_id, union.b_id), (union.b_id, union.a_id)):
-            label = 'Husband_Of' if family.people[one].sex == MALE else 'Wife_Of'
+            sex = family.people[one].sex
+            label = {MALE: 'Husband_Of', FEMALE: 'Wife_Of'}.get(sex, 'Partner_Of')
             (g.V(created[one]).addE(label).to(__.V(created[other])).iterate())
 
     for (low, high), elder in family.birth_order.items():

@@ -10,6 +10,7 @@ GEDCOM is for.
 from __future__ import annotations
 
 from Tree.gedcom.model import PEDIGREE, Document, Family, Individual
+from Tree.kinship.dates import UNKNOWN_DATE, DateValue
 from Tree.kinship.model import (
     ADOPTIVE,
     BIOLOGICAL,
@@ -95,8 +96,8 @@ def to_document(graph: FamilyGraph, tree_name: str = 'Family Tree') -> Document:
             given=person.given,
             surname=person.surname,
             sex=person.sex,
-            birth_year=person.birth_year,
-            death_year=person.death_year,
+            birth=person.birth_date,
+            death=person.death_date,
             child_of=child_links.get(pid, []),
             spouse_in=sorted(spouse_in.get(pid, [])),
             elder_than=younger,
@@ -184,9 +185,9 @@ def parse(text: str) -> tuple[FamilyGraph, dict[str, int]]:
                 current['sex'] = SEX_FROM_GEDCOM.get(value.strip().upper(), UNKNOWN)
             elif level == 2 and tag == 'DATE' and len(context) >= 2:
                 if context[-2] == 'BIRT':
-                    current['birth'] = _year(value)
+                    current['birth'] = DateValue.parse(value)
                 elif context[-2] == 'DEAT':
-                    current['death'] = _year(value)
+                    current['death'] = DateValue.parse(value)
             elif level == 1 and tag == 'FAMC':
                 current['famc'].append([value.strip(), 'BIRTH'])
             elif level == 2 and tag == 'PEDI' and current['famc']:
@@ -212,8 +213,8 @@ def parse(text: str) -> tuple[FamilyGraph, dict[str, int]]:
             given=record.get('given', ''),
             surname=record.get('surname', ''),
             sex=record.get('sex', UNKNOWN),
-            birth_year=record.get('birth'),
-            death_year=record.get('death'),
+            birth=record.get('birth') or UNKNOWN_DATE,
+            death=record.get('death') or UNKNOWN_DATE,
         ))
 
     for record in raw_families.values():
