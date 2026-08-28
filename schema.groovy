@@ -80,6 +80,12 @@ def edgeLabels = ['Father_Of', 'Mother_Of', 'Son_Of', 'Daughter_Of',
                   'Husband_Of', 'Wife_Of', 'Brother_Of', 'Sister_Of',
                   'Father_Of*', 'Mother_Of*', 'Son_Of*', 'Daughter_Of*',
                   'Brother_Of*', 'Sister_Of*',
+                  // Sex-neutral equivalents. The gendered labels above cannot express a
+                  // parent, child or spouse whose sex is unrecorded or is neither male nor
+                  // female, so without these the interface would have to demand a sex before
+                  // it would accept a link — turning an honest "not known" into a forced
+                  // guess. Readers treat these exactly like their gendered counterparts.
+                  'Parent_Of', 'Parent_Of*', 'Child_Of', 'Child_Of*', 'Partner_Of',
                   'ex-spouse_Of', 'BORN_IN', 'NATIVE_TO',
                   // A birth order somebody remembers. Stored as a fact of its own rather
                   // than as a guessed date, because a guessed date is an invented record —
