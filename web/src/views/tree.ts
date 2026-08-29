@@ -115,8 +115,7 @@ function renderLineage(): string {
   const kids = childrenOf(id);
 
   const body = kids.length > 0
-    ? `<div class="lin-drop"></div>
-       <div class="lin-row${kids.length > 1 ? ' is-multi' : ''}">
+    ? `<div class="lin-row">
          ${kids.map((kid) => lineageChild(kid)).join('')}
        </div>`
     : `<div class="lin-leaf">
@@ -127,6 +126,7 @@ function renderLineage(): string {
   return `
     <div class="canvas" data-pan>
       <div class="canvas-in is-lineage">
+        <svg class="wires" aria-hidden="true"></svg>
         <div class="lin-focus">
           <div class="couple">${card(p, false)}${spousePill(spouseOf(id))}</div>
         </div>
@@ -191,6 +191,7 @@ function renderAll(): string {
   return `
     <div class="canvas" data-pan>
       <div class="canvas-in">
+        <svg class="wires" aria-hidden="true"></svg>
         ${topRow}
         <div class="${rowClasses.join(' ')}">
           ${branchIds.map((id) => branch(id)).join('')}

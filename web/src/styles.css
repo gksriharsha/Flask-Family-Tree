@@ -139,21 +139,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background-image: radial-gradient(var(--rule-soft) 1px, transparent 1px);
   background-size: 22px 22px;
 }
-.canvas-in { min-width: max-content; padding: 34px 40px 60px; }
+.canvas-in { position: relative; min-width: max-content; padding: 34px 40px 60px; }
+/* Behind the cards, never in the way of a click. */
+.wires { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.canvas-in > *:not(.wires) { position: relative; z-index: 1; }
 .genrow { display: flex; justify-content: center; }
 .branchrow { position: relative; display: flex; align-items: flex-start; justify-content: center; gap: 30px; }
-.branchrow.hastop.multi::before { content: ''; position: absolute; top: 0; left: 14%; right: 14%; border-top: 2px solid var(--olive-line); }
 .branch { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 26px; }
-.branchrow.hastop .branch::before { content: ''; position: absolute; top: 0; left: 50%; height: 26px; border-left: 2px solid var(--olive-line); }
 
 .kidrow { position: relative; display: flex; align-items: stretch; gap: 14px; padding-top: 24px; }
-.kidrow.multi::before { content: ''; position: absolute; top: 0; left: 12%; right: 12%; border-top: 2px solid var(--olive-line); }
 .kid { position: relative; display: flex; flex-direction: column; align-items: stretch; }
 .kid > .card { flex: 1; }
-.kid.tick::before { content: ''; position: absolute; top: -24px; left: 50%; height: 24px; border-left: 2px solid var(--olive-line); }
 
 .couple { display: flex; align-items: stretch; }
-.knot { flex: none; align-self: center; width: 26px; height: 0; border-top: 2px solid var(--rule); }
+/* Spacer only: the union's double rule is drawn in the wire layer. */
+.knot { flex: none; align-self: center; width: 26px; height: 0; }
 
 /* Cards are flex columns so the kinship chip can be pushed to the bottom, which puts every
    chip in a row on one baseline and keeps a long name from making its card taller. */
@@ -474,20 +474,11 @@ select.f-i { height: 38px; }
    is what is being read. */
 .canvas-in.is-lineage { display: flex; flex-direction: column; align-items: center; }
 .lin-focus { display: flex; justify-content: center; }
-.lin-drop { width: 0; height: 26px; border-left: 2px solid var(--olive-line); }
 .lin-row {
   position: relative; display: flex; align-items: flex-start; justify-content: center;
-  gap: 26px; padding-top: 22px;
-}
-.lin-row.is-multi::before {
-  content: ''; position: absolute; top: 0; left: 16%; right: 16%;
-  border-top: 2px solid var(--olive-line);
+  gap: 30px; padding-top: 62px;
 }
 .lin-kid { position: relative; display: flex; flex-direction: column; align-items: center; }
-.lin-kid::before {
-  content: ''; position: absolute; top: -22px; left: 50%; height: 22px;
-  border-left: 2px solid var(--olive-line);
-}
 .lin-leaf {
   max-width: 40ch; margin-top: 22px; padding: 12px 14px;
   border: 1px dashed var(--olive-line); border-radius: 4px; background: var(--surface);

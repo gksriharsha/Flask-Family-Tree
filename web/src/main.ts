@@ -268,6 +268,8 @@ function render(): void {
     }
   }
 
+  drawWires();
+
   // Typing is not allowed to trigger a re-render, so the caret is only ever restored here --
   // after a toggle rebuilt the sheet -- rather than on every keystroke.
   if (state.editor) {
@@ -724,6 +726,134 @@ document.addEventListener('keydown', (event) => {
     render();
   }
 });
+
+/* ── connectors ────────────────────────────────────────────────────────────── */
+/**
+ * Draw the descent and marriage lines by measuring where the cards actually are.
+ *
+ * They used to be CSS pseudo-elements positioned at percentages -- a horizontal bar at
+ * `left:16%; right:16%` with ticks dropping from each child. Those percentages have nothing
+ * to do with where the children sit, so the bar overshot the outer children by tens of
+ * pixels, and unevenly, because a child block is wider when a spouse pill is attached to it.
+ * Measuring is the only way the line meets the card it claims to join.
+ *
+ * Descent is one curve per child rather than a bar with ticks: no bar means no bar to
+ * misalign, and a curve carries a 1.25px stroke where a right angle would look broken.
+ * Marriage is a double rule -- the mark genealogy has used for it for centuries -- in a warm
+ * neutral, so a union differs from a descent in colour as well as in form.
+ */
+const DESCENT = '#8FAE66';
+const UNION = '#B08A63';
+
+function drawWires(): void {
+  const canvases = root.querySelectorAll<HTMLElement>('.canvas-in');
+  for (const canvas of canvases) {
+    const svg = canvas.querySelector('svg.wires');
+    if (!svg || !state.graph) continue;
+
+    const base = canvas.getBoundingClientRect();
+    // A person shows as a card or, when they married in, as a pill. Either is an endpoint.
+    const nodes = new Map<number, DOMRect>();
+    for (const el of canvas.querySelectorAll<HTMLElement>('[data-person]')) {
+      const id = Number(el.dataset.person);
+      if (!nodes.has(id)) nodes.set(id, el.getBoundingClientRect());
+    }
+
+    const parts: string[] = [];
+    const feet: string[] = [];
+
+    const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
+    const married = new Set(state.graph.Unions.map((u) => pairKey(u.a, u.b)));
+
+    const byChild = new Map<number, { parent: number; role: string }[]>();
+    for (const link of state.graph.ParentLinks) {
+      if (!nodes.has(link.parent) || !nodes.has(link.child)) continue;
+      const list = byChild.get(link.child) ?? [];
+      list.push({ parent: link.parent, role: link.role });
+      byChild.set(link.child, list);
+    }
+
+    for (const [childId, links] of byChild) {
+      const to = nodes.get(childId)!;
+
+      // A child of two married parents gets ONE line, leaving from between them. Drawing a
+      // line from each parent is just as true and looks like a tangle: with a spouse sitting
+      // to one side, the two lines cross over each other on the way down.
+      const origins: { x: number; y: number; adoptive: boolean }[] = [];
+      const spent = new Set<number>();
+      for (let i = 0; i < links.length; i++) {
+        for (let j = i + 1; j < links.length; j++) {
+          const a = links[i]!;
+          const b = links[j]!;
+          if (spent.has(a.parent) || spent.has(b.parent)) continue;
+          if (!married.has(pairKey(a.parent, b.parent))) continue;
+          const ra = nodes.get(a.parent)!;
+          const rb = nodes.get(b.parent)!;
+          const [l, r] = ra.left <= rb.left ? [ra, rb] : [rb, ra];
+          origins.push({
+            x: (l.right + r.left) / 2 - base.left,
+            y: Math.max(l.bottom, r.bottom) - base.top,
+            adoptive: a.role !== 'biological' || b.role !== 'biological',
+          });
+          spent.add(a.parent);
+          spent.add(b.parent);
+        }
+      }
+      for (const link of links) {
+        if (spent.has(link.parent)) continue;
+        const from = nodes.get(link.parent)!;
+        origins.push({
+          x: from.left + from.width / 2 - base.left,
+          y: from.bottom - base.top,
+          adoptive: link.role !== 'biological',
+        });
+      }
+
+      const x2 = to.left + to.width / 2 - base.left;
+      const y2 = to.top - base.top;
+      for (const origin of origins) {
+        if (y2 <= origin.y - 4) continue;   // not stacked on this canvas
+        // A vertical tangent at both ends, so the line leaves the parents and meets the
+        // child square-on however far apart they are.
+        const bend = Math.max(16, (y2 - origin.y) * 0.55);
+        const dash = origin.adoptive ? ' stroke-dasharray="4 3"' : '';
+        parts.push(`<path d="M${origin.x} ${origin.y} C${origin.x} ${origin.y + bend}, `
+                 + `${x2} ${y2 - bend}, ${x2} ${y2}" fill="none" stroke="${DESCENT}" `
+                 + `stroke-width="1.25" stroke-linecap="round"${dash} />`);
+        feet.push(`${origin.x.toFixed(1)},${origin.y.toFixed(1)}`);
+      }
+    }
+
+    // A small stop where lines leave a couple, so several children read as one issue rather
+    // than as strands that happen to converge.
+    for (const foot of new Set(feet)) {
+      const [x, y] = foot.split(',');
+      parts.push(`<circle cx="${x}" cy="${y}" r="2.4" fill="${DESCENT}" />`);
+    }
+
+    for (const union of state.graph.Unions) {
+      const a = nodes.get(union.a);
+      const b = nodes.get(union.b);
+      if (!a || !b) continue;
+      const [left, right] = a.left <= b.left ? [a, b] : [b, a];
+      const gap = right.left - left.right;
+      if (gap < 6 || gap > 80) continue;   // not drawn side by side on this canvas
+      const x1 = left.right - base.left;
+      const x2 = right.left - base.left;
+      const y = (Math.max(left.top, right.top) + Math.min(left.bottom, right.bottom)) / 2
+              - base.top;
+      parts.push(`<path d="M${x1} ${y - 2.5}H${x2}M${x1} ${y + 2.5}H${x2}"`
+               + ` stroke="${UNION}" stroke-width="1.1" stroke-linecap="round" />`);
+    }
+
+    svg.setAttribute('width', String(canvas.scrollWidth));
+    svg.setAttribute('height', String(canvas.scrollHeight));
+    svg.setAttribute('viewBox', `0 0 ${canvas.scrollWidth} ${canvas.scrollHeight}`);
+    svg.innerHTML = parts.join('');
+  }
+}
+
+window.addEventListener('resize', () => drawWires());
 
 /* ── drag to move the tree ─────────────────────────────────────────────────── */
 /**
