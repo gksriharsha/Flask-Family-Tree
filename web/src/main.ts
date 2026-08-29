@@ -242,13 +242,6 @@ function render(): void {
     return;
   }
 
-  // The whole shell is rebuilt on every render, which resets the canvas scroll. Carry it
-  // across, or selecting anyone throws the reader back to the top-left of the tree.
-  const keptScroll = (() => {
-    const canvas = root.querySelector('.canvas');
-    return canvas ? { x: canvas.scrollLeft, y: canvas.scrollTop } : null;
-  })();
-
   root.innerHTML = `
     <div class="shell">
       ${topBar()}
@@ -260,13 +253,7 @@ function render(): void {
     </div>
     ${state.editor ? renderPersonForm(state.editor) : ''}`;
 
-  if (keptScroll) {
-    const canvas = root.querySelector('.canvas');
-    if (canvas) {
-      canvas.scrollLeft = keptScroll.x;
-      canvas.scrollTop = keptScroll.y;
-    }
-  }
+  applyPan();
 
   drawWires();
 
@@ -579,6 +566,7 @@ root.addEventListener('click', (event) => {
   const view = closest(t, 'data-view');
   if (view) {
     state.view = view.dataset.view as typeof state.view;
+    resetPan();
     render();
     return;
   }
@@ -587,6 +575,7 @@ root.addEventListener('click', (event) => {
   if (focusStep) {
     state.focus = Number(focusStep.dataset.focus);
     state.selected = state.focus;
+    resetPan();
     render();
     return;
   }
@@ -596,15 +585,14 @@ root.addEventListener('click', (event) => {
     // Put this person's own line on the canvas, whichever mode we were in.
     state.view = 'lineage';
     state.focus = Number(showLine.dataset.showline);
+    resetPan();
     render();
     return;
   }
 
   if (closest(t, 'data-recentre')) {
-    const canvas = root.querySelector('.canvas');
-    if (canvas) {
-      canvas.scrollTo({ left: (canvas.scrollWidth - canvas.clientWidth) / 2, top: 0 });
-    }
+    resetPan();
+    applyPan();
     return;
   }
 
@@ -862,45 +850,81 @@ function drawWires(): void {
 
 window.addEventListener('resize', () => drawWires());
 
-/* ── drag to move the tree ─────────────────────────────────────────────────── */
+/* ── move the tree ─────────────────────────────────────────────────────────── */
 /**
- * Panning moves the canvas's own scroll rather than a CSS transform, so the wheel, the
- * scrollbars and keyboard scrolling all still work and nothing can be dragged out of reach.
- * A drag only counts past a few pixels, so a click on a card is still a click.
+ * The canvas is moved by translating its contents, not by scrolling them.
+ *
+ * Scrolling was the first attempt, and it only works when the tree is bigger than the window.
+ * The lineage view shows one generation, which fits -- so there was nothing to scroll and
+ * dragging did nothing at all, while a hint sat there promising otherwise. A transform always
+ * has somewhere to go, which is what "move the tree to the part I want" actually asks for.
+ *
+ * The offset is clamped so a corner of the tree always stays on screen: free panning is only
+ * pleasant when you cannot throw the thing into the void.
  */
 const DRAG_SLOP = 4;
+const KEEP_VISIBLE = 150;
+
 let suppressClick = false;
-let pan: { canvas: HTMLElement; x: number; y: number; sl: number; st: number;
-           moved: boolean } | null = null;
+let panOffset = { x: 0, y: 0 };
+let drag: { x: number; y: number; ox: number; oy: number; moved: boolean } | null = null;
+
+function applyPan(): void {
+  const canvas = root.querySelector<HTMLElement>('.canvas');
+  const inner = canvas?.querySelector<HTMLElement>('.canvas-in');
+  if (!canvas || !inner) return;
+  // Clamping stores what it computes, so measuring before the canvas has been laid out would
+  // bake a nonsense offset in permanently -- which is exactly what happened: a pass during
+  // loading, when the canvas was 0px tall, pinned the tree 150px off the top of the screen.
+  if (canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
+  const limit = (offset: number, content: number, view: number) =>
+    Math.max(KEEP_VISIBLE - content, Math.min(view - KEEP_VISIBLE, offset));
+  panOffset.x = limit(panOffset.x, inner.offsetWidth, canvas.clientWidth);
+  panOffset.y = limit(panOffset.y, inner.offsetHeight, canvas.clientHeight);
+  inner.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px)`;
+}
+
+/** Going somewhere new -- another view, another generation -- starts from centre again. */
+function resetPan(): void {
+  panOffset = { x: 0, y: 0 };
+}
 
 root.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
-  const canvas = (event.target as HTMLElement | null)?.closest?.('[data-pan]');
-  if (!(canvas instanceof HTMLElement)) return;
-  pan = { canvas, x: event.clientX, y: event.clientY,
-          sl: canvas.scrollLeft, st: canvas.scrollTop, moved: false };
+  if (!(event.target as HTMLElement | null)?.closest?.('[data-pan]')) return;
+  drag = { x: event.clientX, y: event.clientY, ox: panOffset.x, oy: panOffset.y, moved: false };
 });
 
 window.addEventListener('pointermove', (event) => {
-  if (!pan) return;
-  const dx = event.clientX - pan.x;
-  const dy = event.clientY - pan.y;
-  if (!pan.moved && Math.abs(dx) < DRAG_SLOP && Math.abs(dy) < DRAG_SLOP) return;
-  if (!pan.moved) {
-    pan.moved = true;
-    pan.canvas.classList.add('is-panning');
+  if (!drag) return;
+  const dx = event.clientX - drag.x;
+  const dy = event.clientY - drag.y;
+  if (!drag.moved && Math.abs(dx) < DRAG_SLOP && Math.abs(dy) < DRAG_SLOP) return;
+  if (!drag.moved) {
+    drag.moved = true;
+    root.querySelector('.canvas')?.classList.add('is-panning');
   }
-  pan.canvas.scrollLeft = pan.sl - dx;
-  pan.canvas.scrollTop = pan.st - dy;
+  panOffset = { x: drag.ox + dx, y: drag.oy + dy };
+  applyPan();
 });
 
 window.addEventListener('pointerup', () => {
-  if (!pan) return;
-  pan.canvas.classList.remove('is-panning');
+  if (!drag) return;
+  root.querySelector('.canvas')?.classList.remove('is-panning');
   // A drag that ended over a card must not also select that card.
-  if (pan.moved) suppressClick = true;
-  pan = null;
+  if (drag.moved) suppressClick = true;
+  drag = null;
 });
+
+// The wheel moves it too, so a trackpad works without holding the button down.
+root.addEventListener('wheel', (event) => {
+  if (!(event.target as HTMLElement | null)?.closest?.('[data-pan]')) return;
+  event.preventDefault();
+  panOffset = { x: panOffset.x - event.deltaX, y: panOffset.y - event.deltaY };
+  applyPan();
+}, { passive: false });
+
+window.addEventListener('resize', () => applyPan());
 
 root.addEventListener('click', (event) => {
   if (!suppressClick) return;

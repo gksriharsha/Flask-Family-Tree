@@ -134,12 +134,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sampled { padding: 9px 10px; background: var(--sunk); border-radius: 3px; font-size: 11.5px; color: var(--ink-2); line-height: 1.55; }
 
 /* ── the tree canvas ─────────────────────────────────────────────────── */
+/* The tree is moved by transforming its contents, so the canvas itself never scrolls. */
 .canvas {
-  position: relative; overflow: auto; background: var(--paper);
+  position: relative; overflow: hidden; background: var(--paper);
   background-image: radial-gradient(var(--rule-soft) 1px, transparent 1px);
   background-size: 22px 22px;
 }
-.canvas-in { position: relative; min-width: max-content; padding: 34px 40px 60px; }
+.canvas-in {
+  position: relative; width: max-content; min-width: 100%;
+  padding: 34px 40px 60px; will-change: transform;
+}
 /* Behind the cards, never in the way of a click. */
 .wires { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: visible; }
 .canvas-in > *:not(.wires) { position: relative; z-index: 1; }
