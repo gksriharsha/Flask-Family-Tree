@@ -11,6 +11,10 @@
     {
       "id": "page-3",
       "name": "Favicon"
+    },
+    {
+      "id": "page-4",
+      "name": "Connectors"
     }
   ],
   "artboards": [
@@ -114,6 +118,33 @@
       "h": 760,
       "title": "Stem — alternate",
       "page": "page-3"
+    },
+    {
+      "file": "Connectors.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 680,
+      "h": 860,
+      "title": "Drawn — recommended",
+      "page": "page-4"
+    },
+    {
+      "file": "Elbow.dc.html",
+      "x": 800,
+      "y": 0,
+      "w": 680,
+      "h": 640,
+      "title": "Ledger — alternate",
+      "page": "page-4"
+    },
+    {
+      "file": "Marriage.dc.html",
+      "x": 1600,
+      "y": 0,
+      "w": 520,
+      "h": 900,
+      "title": "Marriage, four ways",
+      "page": "page-4"
     }
   ],
   "annotations": [
@@ -196,10 +227,18 @@
       "w": 560,
       "page": "page-3",
       "text": "The app has no favicon at all today — the tab shows a blank document.\nThe existing leaf mark cannot simply be shrunk: its 1.7px strokes on a 24 grid become 1.1px at 16, which is sub-pixel mush. All three of these are redrawn for small sizes, and each is shown at true 16/24/32/48 and sitting in a real tab, because that is the only size the judgement can honestly be made at."
+    },
+    {
+      "id": "note-connectors",
+      "x": 0,
+      "y": -210,
+      "w": 680,
+      "page": "page-4",
+      "text": "The green lines are not only heavy — they are drawn to fixed percentages (left:16%, right:16%) rather than to the children they join. Measured in the running app the bar overshoots the left child by 39px and the right by 62px, unevenly, because each child block is a different width once a spouse is attached.\nSo the fix is structural, not cosmetic: draw each line to the child it actually connects, and give marriage a mark of its own kind."
     }
   ],
   "launch": {
     "view": "canvas",
-    "page": "page-3"
+    "page": "page-4"
   }
 }
