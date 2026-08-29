@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Family Tree</title>
+  <rect width="32" height="32" rx="7" fill="#3F6D14"/>
+  <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+    <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+    <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+  </g>
+</svg>
