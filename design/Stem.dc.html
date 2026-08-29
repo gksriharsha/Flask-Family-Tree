@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@400;500;600;700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;display=swap">
+  <style>
+    :root {
+      --paper:#eff1ea; --sunk:#e2e7d6; --ink:#1a1e15; --ink-2:#3d4636; --muted:#6b7563;
+      --rule:#d3d9c6; --olive:#3f6d14; --brown:#8f3f0a; --brown-soft:#f4e3d5;
+      --serif:'Faustina','Iowan Old Style',Georgia,serif;
+      --sans:'Source Sans 3','Helvetica Neue',Arial,sans-serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:14px; line-height:1.5;
+           -webkit-font-smoothing:antialiased; }
+    a { color:#1261bb; text-decoration:none; }
+    a:hover { color:#0e4e96; text-decoration:underline; }
+    .lbl { margin:0 0 10px; font-size:10px; font-weight:700; letter-spacing:.12em;
+           text-transform:uppercase; color:var(--muted); }
+  </style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:24px; width:480px; padding:26px 24px 30px">
+
+  <div>
+    <h2 style="margin:0 0 4px; font-family:var(--serif); font-size:21px; font-weight:600">Stem</h2>
+    <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.55; max-width:44ch">
+      The existing mark on its own, no tile &mdash; strokes thickened and leaves filled so it
+      does not dissolve. The lightest of the three, and identical to what sits in the top bar.
+    </p>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:24px">
+    <svg width="112" height="112" viewBox="0 0 32 32" aria-label="Stem mark">
+      <path d="M16 27V15" stroke="#3F6D14" stroke-width="3.6" stroke-linecap="round"/>
+      <path d="M16 15.6C16 9.2 11 5 5.4 5c0 6.4 4.2 10.6 10.6 10.6Z" fill="#3F6D14"/>
+      <path d="M16 19.8c0-5.1 3.9-8.5 8.5-8.5 0 5.1-3.4 8.5-8.5 8.5Z" fill="#7FA352"/>
+    </svg>
+    <div style="font-size:12px; color:var(--ink-2); line-height:1.6; max-width:24ch">
+      Stroke raised from 1.7 to 3.6 on the same grid, which is 1.8px at 16 rather than 1.1px.
+    </div>
+  </div>
+
+  <div>
+    <p class="lbl">Actual size</p>
+    <div style="display:flex; align-items:flex-end; gap:26px">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="16" height="16" viewBox="0 0 32 32">
+          <path d="M16 27V15" stroke="#3F6D14" stroke-width="3.6" stroke-linecap="round"/>
+          <path d="M16 15.6C16 9.2 11 5 5.4 5c0 6.4 4.2 10.6 10.6 10.6Z" fill="#3F6D14"/>
+          <path d="M16 19.8c0-5.1 3.9-8.5 8.5-8.5 0 5.1-3.4 8.5-8.5 8.5Z" fill="#7FA352"/>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">16</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="24" height="24" viewBox="0 0 32 32">
+          <path d="M16 27V15" stroke="#3F6D14" stroke-width="3.6" stroke-linecap="round"/>
+          <path d="M16 15.6C16 9.2 11 5 5.4 5c0 6.4 4.2 10.6 10.6 10.6Z" fill="#3F6D14"/>
+          <path d="M16 19.8c0-5.1 3.9-8.5 8.5-8.5 0 5.1-3.4 8.5-8.5 8.5Z" fill="#7FA352"/>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">24</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="32" height="32" viewBox="0 0 32 32">
+          <path d="M16 27V15" stroke="#3F6D14" stroke-width="3.6" stroke-linecap="round"/>
+          <path d="M16 15.6C16 9.2 11 5 5.4 5c0 6.4 4.2 10.6 10.6 10.6Z" fill="#3F6D14"/>
+          <path d="M16 19.8c0-5.1 3.9-8.5 8.5-8.5 0 5.1-3.4 8.5-8.5 8.5Z" fill="#7FA352"/>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">32</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="48" height="48" viewBox="0 0 32 32">
+          <path d="M16 27V15" stroke="#3F6D14" stroke-width="3.6" stroke-linecap="round"/>
+          <path d="M16 15.6C16 9.2 11 5 5.4 5c0 6.4 4.2 10.6 10.6 10.6Z" fill="#3F6D14"/>
+          <path d="M16 19.8c0-5.1 3.9-8.5 8.5-8.5 0 5.1-3.4 8.5-8.5 8.5Z" fill="#7FA352"/>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">48</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="lbl">In a tab — light, then dark</p>
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div style="display:flex; align-items:flex-end; padding:6px 6px 0; background:#dee1e6;
+                  border-radius:5px 5px 0 0">
+        <div style="display:flex; align-items:center; gap:8px; width:210px; height:32px;
+                    padding:0 10px; background:#f8f9fa; border-radius:7px 7px 0 0">
+          <svg width="16" height="16" viewBox="0 0 32 32" style="flex:none">
+            <path d="M16 27V15" stroke="#3F6D14" stroke-width="3.6" stroke-linecap="round"/>
+            <path d="M16 15.6C16 9.2 11 5 5.4 5c0 6.4 4.2 10.6 10.6 10.6Z" fill="#3F6D14"/>
+            <path d="M16 19.8c0-5.1 3.9-8.5 8.5-8.5 0 5.1-3.4 8.5-8.5 8.5Z" fill="#7FA352"/>
+          </svg>
+          <span style="flex:1; font-size:12px; color:#3c4043">Family Tree</span>
+          <span style="flex:none; color:#5f6368; font-size:13px">&times;</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:flex-end; padding:6px 6px 0; background:#202124;
+                  border-radius:5px 5px 0 0">
+        <div style="display:flex; align-items:center; gap:8px; width:210px; height:32px;
+                    padding:0 10px; background:#35363a; border-radius:7px 7px 0 0">
+          <svg width="16" height="16" viewBox="0 0 32 32" style="flex:none">
+            <path d="M16 27V15" stroke="#3F6D14" stroke-width="3.6" stroke-linecap="round"/>
+            <path d="M16 15.6C16 9.2 11 5 5.4 5c0 6.4 4.2 10.6 10.6 10.6Z" fill="#3F6D14"/>
+            <path d="M16 19.8c0-5.1 3.9-8.5 8.5-8.5 0 5.1-3.4 8.5-8.5 8.5Z" fill="#7FA352"/>
+          </svg>
+          <span style="flex:1; font-size:12px; color:#e8eaed">Family Tree</span>
+          <span style="flex:none; color:#9aa0a6; font-size:13px">&times;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:11px 13px; border-left:3px solid var(--brown); border-radius:0 3px 3px 0;
+              background:var(--brown-soft); font-size:12px; color:#6d300a; line-height:1.6">
+    <strong>The trade, and it is visible above.</strong> With no tile, a dark olive mark on a
+    dark tab nearly disappears. Fixing that means a second light-mode file and a
+    <code style="font-size:11px">prefers-color-scheme</code> swap, which browsers honour
+    unevenly for favicons.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

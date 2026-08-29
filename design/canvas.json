@@ -7,6 +7,10 @@
     {
       "id": "page-2",
       "name": "Earlier screens"
+    },
+    {
+      "id": "page-3",
+      "name": "Favicon"
     }
   ],
   "artboards": [
@@ -83,6 +87,33 @@
       "h": 1000,
       "title": "Family vocabulary",
       "page": "page-2"
+    },
+    {
+      "file": "Seal.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 560,
+      "h": 780,
+      "title": "Seal — recommended",
+      "page": "page-3"
+    },
+    {
+      "file": "Descent.dc.html",
+      "x": 680,
+      "y": 0,
+      "w": 480,
+      "h": 700,
+      "title": "Descent — alternate",
+      "page": "page-3"
+    },
+    {
+      "file": "Stem.dc.html",
+      "x": 1280,
+      "y": 0,
+      "w": 480,
+      "h": 760,
+      "title": "Stem — alternate",
+      "page": "page-3"
     }
   ],
   "annotations": [
@@ -157,10 +188,18 @@
       "w": 940,
       "text": "ONE RELATION, SEVERAL WORDS — AND THE LIST GROWS\n\nYour father's people say చిన్నాన్న; your mother's say కక్కయ్య. Neither is a correction of the other.\n\nThe equivalents are DATA, not a fixed list. Type a word into any row and it joins that relation's alternatives immediately — because you discover these one at a time, from an aunt who uses a word you have never heard.\n\nAnd a word can be PINNED to one person. In the tree's right rail, tap any equivalent to always use it for that individual — 'everyone calls this particular uncle బాబాయి' — without changing what anyone else is called. Optional: the vocabulary already gives a sensible default, so the pin is only for the exceptions.\n\nThree sources, in order: the pin on the person, then the side's vocabulary, then the default. None of it touches a single link in the data, because the relationship is a struct and these are only its words.",
       "page": "page-2"
+    },
+    {
+      "id": "note-favicon",
+      "x": 0,
+      "y": -200,
+      "w": 560,
+      "page": "page-3",
+      "text": "The app has no favicon at all today — the tab shows a blank document.\nThe existing leaf mark cannot simply be shrunk: its 1.7px strokes on a 24 grid become 1.1px at 16, which is sub-pixel mush. All three of these are redrawn for small sizes, and each is shown at true 16/24/32/48 and sitting in a real tab, because that is the only size the judgement can honestly be made at."
     }
   ],
   "launch": {
     "view": "canvas",
-    "page": "page-1"
+    "page": "page-3"
   }
 }

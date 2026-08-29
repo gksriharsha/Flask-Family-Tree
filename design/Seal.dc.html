@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@400;500;600;700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;display=swap">
+  <style>
+    :root {
+      --paper:#eff1ea; --surface:#fafbf7; --surface-2:#e7ebde; --sunk:#e2e7d6;
+      --ink:#1a1e15; --ink-2:#3d4636; --muted:#6b7563; --rule:#d3d9c6; --rule-soft:#e3e7d8;
+      --olive:#3f6d14; --olive-soft:#e4edd4; --olive-line:#7fa352;
+      --serif:'Faustina','Iowan Old Style',Georgia,serif;
+      --sans:'Source Sans 3','Helvetica Neue',Arial,sans-serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:14px; line-height:1.5;
+           -webkit-font-smoothing:antialiased; }
+    a { color:#1261bb; text-decoration:none; }
+    a:hover { color:#0e4e96; text-decoration:underline; }
+    .lbl { margin:0 0 10px; font-size:10px; font-weight:700; letter-spacing:.12em;
+           text-transform:uppercase; color:var(--muted); }
+  </style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:26px; width:560px; padding:26px 24px 30px">
+
+  <div>
+    <h2 style="margin:0 0 4px; font-family:var(--serif); font-size:21px; font-weight:600">Seal</h2>
+    <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.55; max-width:46ch">
+      The app&rsquo;s own leaf-and-stem mark, redrawn as solid shapes and knocked out of an olive
+      tile. The tile is what makes it survive: a filled silhouette reads at 16px and holds its
+      own on a light or a dark tab, which a 1.7px stroke does not.
+    </p>
+  </div>
+
+  <!-- the drawing, large enough to judge -->
+  <div style="display:flex; align-items:center; gap:24px">
+    <svg width="112" height="112" viewBox="0 0 32 32" aria-label="Family Tree mark">
+      <rect x="0" y="0" width="32" height="32" rx="7" fill="#3F6D14"/>
+      <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+        <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+        <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+        <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+      </g>
+    </svg>
+    <div style="display:flex; flex-direction:column; gap:7px; font-size:12px; color:var(--ink-2)">
+      <div style="display:flex; align-items:center; gap:9px">
+        <span style="width:15px; height:15px; border-radius:3px; background:#3F6D14"></span>
+        <span><strong>#3F6D14</strong> &nbsp;tile — the app&rsquo;s olive</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px">
+        <span style="width:15px; height:15px; border-radius:3px; background:#EFF1EA;
+                     border:1px solid var(--rule)"></span>
+        <span><strong>#EFF1EA</strong> &nbsp;stem and upper leaf</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px">
+        <span style="width:15px; height:15px; border-radius:3px; background:#7FA352;
+                     border:1px solid var(--rule)"></span>
+        <span><strong>#7FA352</strong> &nbsp;lower leaf — the top bar&rsquo;s own second olive</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- the only test that matters: actual pixel sizes, unscaled -->
+  <div>
+    <p class="lbl">Actual size</p>
+    <div style="display:flex; align-items:flex-end; gap:26px">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="16" height="16" viewBox="0 0 32 32">
+          <rect x="0" y="0" width="32" height="32" rx="7" fill="#3F6D14"/>
+          <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+            <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+            <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+          </g>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">16</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="24" height="24" viewBox="0 0 32 32">
+          <rect x="0" y="0" width="32" height="32" rx="7" fill="#3F6D14"/>
+          <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+            <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+            <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+          </g>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">24</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="32" height="32" viewBox="0 0 32 32">
+          <rect x="0" y="0" width="32" height="32" rx="7" fill="#3F6D14"/>
+          <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+            <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+            <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+          </g>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">32</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:7px">
+        <svg width="48" height="48" viewBox="0 0 32 32">
+          <rect x="0" y="0" width="32" height="32" rx="7" fill="#3F6D14"/>
+          <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+            <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+            <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+          </g>
+        </svg>
+        <span style="font-size:10px; color:var(--muted)">48</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- where it will actually be seen -->
+  <div>
+    <p class="lbl">In a tab</p>
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div style="display:flex; align-items:flex-end; padding:6px 6px 0; background:#dee1e6;
+                  border-radius:5px 5px 0 0">
+        <div style="display:flex; align-items:center; gap:8px; width:210px; height:32px;
+                    padding:0 10px; background:#f8f9fa; border-radius:7px 7px 0 0">
+          <svg width="16" height="16" viewBox="0 0 32 32" style="flex:none">
+            <rect x="0" y="0" width="32" height="32" rx="7" fill="#3F6D14"/>
+            <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+              <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+              <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+              <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+            </g>
+          </svg>
+          <span style="flex:1; font-size:12px; color:#3c4043; white-space:nowrap;
+                       overflow:hidden; text-overflow:ellipsis">Family Tree</span>
+          <span style="flex:none; color:#5f6368; font-size:13px">&times;</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-end; padding:6px 6px 0; background:#202124;
+                  border-radius:5px 5px 0 0">
+        <div style="display:flex; align-items:center; gap:8px; width:210px; height:32px;
+                    padding:0 10px; background:#35363a; border-radius:7px 7px 0 0">
+          <svg width="16" height="16" viewBox="0 0 32 32" style="flex:none">
+            <rect x="0" y="0" width="32" height="32" rx="7" fill="#3F6D14"/>
+            <g transform="translate(16 16.6) scale(0.88) translate(-16 -16.6)">
+              <path d="M16 26.5V14.4" stroke="#EFF1EA" stroke-width="3.4" stroke-linecap="round"/>
+              <path d="M16 15.1C16 9.1 11.3 5.1 6 5.1c0 6 4 10 10 10Z" fill="#EFF1EA"/>
+              <path d="M16 19.1c0-4.8 3.7-8 8-8 0 4.8-3.2 8-8 8Z" fill="#7FA352"/>
+            </g>
+          </svg>
+          <span style="flex:1; font-size:12px; color:#e8eaed; white-space:nowrap;
+                       overflow:hidden; text-overflow:ellipsis">Family Tree</span>
+          <span style="flex:none; color:#9aa0a6; font-size:13px">&times;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:11px 13px; background:var(--sunk); border-radius:4px; font-size:12px;
+              color:var(--ink-2); line-height:1.6">
+    The tile carries the whole burden at small sizes, so the glyph inside can stay the mark
+    already in the top bar rather than becoming a different animal. The lower leaf keeps #7FA352, the second olive the top-bar mark already uses, so the favicon
+    and the mark are the same two colours rather than merely similar. It is the closest of the
+    tints to the tile, so the lower leaf softens at 16px and the icon reads as one leaf and a
+    stem at that size — a lighter sage separates them more, at the cost of a colour the brand
+    does not otherwise contain.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
