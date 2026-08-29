@@ -298,108 +298,158 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* ── the add/edit sheet ─────────────────────────────────────────────────────────
-   A sheet rather than a route, because adding a relative is nearly always done while
-   looking at somebody — losing the tree behind a full-page form is what makes people
-   enter a placeholder instead of going back to check. */
+   Sections are separated by a rule and a heading, not boxed. A bordered card inside
+   a bordered card inside a sheet is three shades of the same paper, and it is what
+   made this read as a tax form. Inputs are underlined, which is the vocabulary the
+   rest of the app already uses. */
 .sheet {
   position: fixed; inset: 0; z-index: 40;
   display: flex; justify-content: center; align-items: flex-start;
-  padding: 32px 16px; overflow-y: auto;
-  background: rgb(26 30 21 / 38%);
+  padding: 40px 16px; overflow-y: auto;
+  background: rgb(26 30 21 / 34%);
+  backdrop-filter: blur(1.5px);
 }
 .sheet-in {
-  width: 100%; max-width: 680px;
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 700px;
   background: var(--surface);
-  border: 1px solid var(--rule); border-radius: 5px;
-  box-shadow: 0 18px 48px rgb(26 30 21 / 22%);
-  padding: 22px 24px 18px;
+  border: 1px solid var(--rule); border-radius: 6px;
+  box-shadow: 0 24px 60px rgb(26 30 21 / 26%);
+  overflow: hidden;
 }
-.sheet-top { display: flex; align-items: center; gap: 12px; }
-.sheet-top h2 { margin: 0; font-family: var(--serif); font-size: 21px; font-weight: 600; }
+
+/* A warm band at the head, so the sheet opens on something other than more paper. */
+.sheet-top {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 20px 26px 18px;
+  background: linear-gradient(var(--olive-soft), var(--surface));
+  border-bottom: 1px solid var(--rule-soft);
+}
+.sheet-top h2 {
+  margin: 0; font-family: var(--serif); font-size: 23px; font-weight: 600;
+  line-height: 1.15; letter-spacing: -0.005em;
+}
+.sheet-sub {
+  margin: 5px 0 0; max-width: 54ch;
+  font-size: 12.5px; color: var(--ink-2); line-height: 1.55;
+}
 .sheet-top .x {
-  margin-left: auto; width: 30px; height: 30px; line-height: 1;
-  border: 1px solid var(--rule); border-radius: 3px;
-  background: var(--surface); color: var(--muted); font-size: 19px;
+  flex: none; margin-left: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  border: 1px solid transparent; border-radius: 15px;
+  background: transparent; color: var(--muted);
 }
-.sheet .lede { margin: 8px 0 18px; color: var(--ink-2); font-size: 13.5px; max-width: 56ch; }
+.sheet-top .x:hover { border-color: var(--rule); background: var(--surface); color: var(--ink); }
 
-.dategroup {
-  margin: 0 0 14px; padding: 12px 14px 13px;
-  border: 1px solid var(--rule-soft); border-radius: 4px; background: var(--paper);
-}
-.dategroup legend {
-  padding: 0 6px; font-size: 11px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
-}
+.sheet-body { padding: 4px 26px 20px; }
 
-/* Variant classes carry an is- prefix so a modifier can never also match a block of the
-   same name — .yr as a bare variant would collide with any future .yr block. */
-.modes { display: flex; flex-wrap: wrap; gap: 6px; }
-.modes button {
-  height: 29px; padding: 0 11px;
-  border: 1px solid var(--rule); border-radius: 3px;
+.fgroup { padding: 18px 0 2px; border-top: 1px solid var(--rule-soft); }
+.fgroup.is-first { padding-top: 20px; border-top: 0; }
+.fg-h {
+  margin: 0 0 12px; font-family: var(--serif); font-size: 15px; font-weight: 600;
+  color: var(--ink);
+}
+.fg-opt {
+  margin-left: 6px; font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+.fg-note { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.sub-l {
+  margin: 0 0 7px; font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.chips + .sub-l { margin-top: 15px; }
+
+/* Underlined fields. No box, no radius — the ledger look the app already has. */
+.frow { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-end; margin-top: 14px; }
+.frow.is-tight { gap: 10px; margin-top: 12px; }
+.f { display: flex; flex-direction: column; gap: 2px; }
+.f-l { font-size: 11px; font-weight: 600; color: var(--muted); }
+.f-i {
+  /* One height for every field, so a row's labels and underlines both align even when
+     one input is set larger than its neighbour. */
+  height: 38px; padding: 0 2px;
+  border: none; border-bottom: 1px solid #9aa48d; border-radius: 0;
+  background: transparent; color: var(--ink);
+  font: inherit; font-size: 14.5px;
+}
+.f-i:focus { outline: none; border-bottom: 2px solid var(--blue); padding-bottom: 0; }
+.f-i::placeholder { color: #9aa48d; }
+select.f-i { height: 38px; }
+.f.is-grow { flex: 1 1 240px; }
+.f.is-yr { width: 116px; }
+.f.is-sm { width: 84px; }
+/* The name is the one thing that must be filled in, so it is the one thing set in the
+   serif, at size. */
+.f.is-hero .f-i { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+.joiner { padding-bottom: 11px; font-size: 12.5px; color: var(--muted); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  height: 30px; padding: 0 12px;
+  border: 1px solid var(--rule); border-radius: 15px;
   background: var(--surface); color: var(--ink-2);
   font-size: 12.5px; font-weight: 600;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.modes button[aria-pressed='true'] {
-  border-color: var(--olive-line); background: var(--olive-soft); color: var(--olive);
+.chip:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.chip.is-on { border-color: var(--olive); background: var(--olive); color: #fff; }
+.chip.is-on:hover { background: #365d11; }
+/* Selected, but meaning "the record does not say" — deliberately not celebrated. */
+.chip.is-blank {
+  border-style: dashed; border-color: #9aa48d; background: var(--surface-2);
+  color: var(--ink-2);
 }
 
-.daterow { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 11px; }
-.fld { display: flex; flex-direction: column; gap: 4px; }
-.fld > span { font-size: 11.5px; font-weight: 600; color: var(--muted); }
-.fld input, .fld select {
-  height: 32px; padding: 0 9px;
-  border: 1px solid var(--rule); border-radius: 3px;
-  background: var(--surface); color: var(--ink);
-  font-family: inherit; font-size: 14px;
+/* What the record will say, set like a record rather than an alert. */
+.reads {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  margin-top: 14px; padding: 9px 0 0; border-top: 1px dotted var(--rule);
 }
-.fld.is-grow { flex: 1 1 210px; }
-.fld.is-yr { width: 108px; }
-.fld.is-sm { width: 84px; }
-.andword { padding-bottom: 8px; color: var(--muted); font-size: 13px; }
+.rd-v { font-family: var(--serif); font-size: 17px; font-weight: 600; color: var(--olive); }
+/* Nothing recorded is not an achievement: it reads in the muted voice, not the olive one. */
+.reads.is-blank .rd-v { color: var(--muted); font-style: italic; font-weight: 500; }
+.rd-n { flex: 1 1 220px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
 
-.dategroup .nothing { margin: 10px 0 0; color: var(--muted); font-size: 12.5px; max-width: 60ch; }
-
-/* The live read-back. Showing what the record will actually say is what stops somebody
-   entering an exact date they do not have. */
-.preview {
-  margin-top: 12px; padding: 9px 11px;
-  border-left: 2px solid var(--olive-line); background: var(--olive-soft); border-radius: 0 3px 3px 0;
-}
-.preview .pv { font-size: 13.5px; color: var(--ink); }
-.preview .pv strong { font-family: var(--serif); font-size: 15px; }
-.preview .pm { margin-top: 3px; font-size: 12px; color: var(--ink-2); }
-
-.linklist { margin: 8px 0 0; padding: 0; list-style: none; }
-.linklist li {
+.links-list { margin: 0; padding: 0; list-style: none; }
+.links-list li {
   display: flex; align-items: center; gap: 10px;
-  padding: 7px 0; border-bottom: 1px solid var(--rule-soft); font-size: 13.5px;
+  padding: 8px 0; border-bottom: 1px solid var(--rule-soft); font-size: 13.5px;
 }
-.linklist li:last-child { border-bottom: 0; }
-.linklist li span { flex: 1; }
-.linklist li em { color: var(--brown); font-style: normal; font-size: 12px; }
-.linklist li button {
+.links-list li:last-child { border-bottom: 0; }
+.links-list li span { flex: 1; }
+.links-list li em { color: var(--brown); font-style: normal; font-size: 11.5px; }
+.links-list li button {
   height: 26px; padding: 0 10px;
-  border: 1px solid var(--rule); border-radius: 3px;
-  background: var(--surface); color: var(--muted); font-size: 12px;
+  border: 1px solid transparent; border-radius: 13px;
+  background: transparent; color: var(--muted); font-size: 12px; font-weight: 600;
 }
-.linklist li button:hover { border-color: var(--brown); color: var(--brown); }
+.links-list li button:hover { border-color: var(--brown); background: var(--brown-soft); color: var(--brown); }
+
+.sheet-err {
+  margin: 14px 0 0; padding: 9px 12px;
+  border-left: 3px solid var(--brown); border-radius: 0 3px 3px 0;
+  background: var(--brown-soft); color: #6d300a; font-size: 12.5px;
+}
 
 .sheet-foot {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule);
+  padding: 14px 26px; border-top: 1px solid var(--rule);
+  background: var(--paper);
 }
 .sheet-foot .spacer { flex: 1; }
-.sheet-foot .delwarn { flex: 1 1 100%; color: var(--brown); font-size: 12.5px; }
-.btn.wide { width: 100%; }
-.btn.danger { border-color: var(--brown); background: var(--brown); }
-.btn.danger-text { color: var(--brown); border-color: var(--rule); }
-.sheet .err { margin: 4px 0 0; color: var(--brown); font-size: 13px; }
+.sheet-foot .delwarn { flex: 1 1 100%; color: var(--brown); font-size: 12.5px; line-height: 1.5; }
+.btn.is-flat { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.is-flat:hover { border-color: var(--rule); background: var(--surface); }
+.btn.is-danger { border-color: var(--brown); background: var(--brown); color: #fff; }
+.btn.is-danger-text { color: var(--brown); }
+.btn.is-danger-text:hover { border-color: var(--brown); background: var(--brown-soft); }
 
 @media (max-width: 720px) {
   .sheet { padding: 0; }
   .sheet-in { max-width: none; min-height: 100%; border: 0; border-radius: 0; }
+  .sheet-top, .sheet-body, .sheet-foot { padding-left: 18px; padding-right: 18px; }
+  .sheet-foot { position: sticky; bottom: 0; }
 }
 
 /* ── panning ─────────────────────────────────────────────────────────────────

@@ -315,10 +315,12 @@ function refreshPreview(): void {
   for (const which of ['birth', 'death'] as const) {
     const box = root.querySelector(`.sheet [data-preview="${which}"]`);
     if (!box) continue;
-    const value = box.querySelector('.pv strong');
-    const note = box.querySelector('.pm');
+    const value = box.querySelector('.rd-v');
+    const note = box.querySelector('.rd-n');
     if (value) value.textContent = reads(draft[which]);
-    if (note) note.textContent = sorts(draft[which]);
+    if (note) note.textContent = sorts(draft[which], which);
+    // An absent date is not rendered as though it were a value.
+    box.classList.toggle('is-blank', draft[which].mode === 'unknown');
   }
 }
 
