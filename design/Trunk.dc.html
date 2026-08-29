@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@400;500;600;700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;family=Noto+Serif+Telugu:wght@400;500;600&amp;display=swap">
+  <style>
+    :root {
+      --paper:#eff1ea; --surface:#fafbf7; --surface-2:#e7ebde; --sunk:#e2e7d6;
+      --ink:#1a1e15; --ink-2:#3d4636; --muted:#6b7563; --rule:#d3d9c6; --rule-soft:#e3e7d8;
+      --olive:#3f6d14; --olive-soft:#e4edd4; --olive-line:#7fa352;
+      --brown:#8f3f0a; --brown-soft:#f4e3d5;
+      --serif:'Faustina','Iowan Old Style',Georgia,serif;
+      --sans:'Source Sans 3','Helvetica Neue',Arial,'Noto Serif Telugu',sans-serif;
+      --telugu:'Noto Serif Telugu','Faustina',serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:14px; line-height:1.5;
+           -webkit-font-smoothing:antialiased; }
+    a { color:#1261bb; text-decoration:none; }
+    a:hover { color:#0e4e96; text-decoration:underline; }
+    .lbl { margin:0 0 10px; font-size:10px; font-weight:700; letter-spacing:.12em;
+           text-transform:uppercase; color:var(--muted); }
+    .te { font-family:var(--telugu); }
+    .card { position:absolute; width:172px; padding:9px 10px 10px; background:var(--surface);
+            border:1px solid var(--rule); border-radius:4px; }
+    .nm { display:block; font-family:var(--serif); font-size:14.5px; font-weight:600;
+          line-height:1.2; }
+    .yrs { display:block; margin:3px 0 8px; font-size:11.5px; color:var(--muted); }
+    .kin { display:inline-flex; padding:3px 7px; font-size:11px; font-weight:600;
+           color:var(--olive); background:var(--olive-soft); border-radius:3px; }
+    .sym { display:inline-block; width:8px; height:8px; margin-right:6px;
+           border:1.5px solid var(--muted); vertical-align:1px; }
+    .sym.f { border-radius:50%; }
+    .pill { position:absolute; display:inline-flex; align-items:center; gap:6px; height:40px;
+            padding:0 11px; border:1px solid var(--rule); border-radius:20px;
+            background:var(--surface-2); }
+    .pill .pn { display:block; font-size:11.5px; font-weight:600; line-height:1.25; }
+    .pill .pk { display:block; font-family:var(--telugu); font-size:11px; color:var(--muted);
+                line-height:1.3; }
+  </style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:24px; width:680px; padding:26px 24px 30px">
+
+  <div>
+    <h2 style="margin:0 0 4px; font-family:var(--serif); font-size:21px; font-weight:600">Trunk</h2>
+    <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.55; max-width:58ch">
+      The conventional genealogical form, drawn correctly: a trunk from between the parents,
+      a sibling bar spanning exactly the children it joins, and a short drop into each. The
+      bar is measured rather than set at a percentage, so it cannot overshoot. A child linked
+      by anything other than birth has a dashed drop.
+    </p>
+  </div>
+
+  <!-- the treatment, at the app's real card size -->
+  <div style="position:relative; height:360px; background:var(--paper);
+              background-image:radial-gradient(var(--rule-soft) 1px, transparent 1px);
+              background-size:22px 22px; border:1px solid var(--rule-soft); border-radius:4px">
+
+    <svg width="632" height="360" viewBox="0 0 632 360"
+         style="position:absolute; inset:0" aria-hidden="true">
+      <!-- descent: a trunk from the couple, a sibling bar measured to the children it
+           joins, and a short drop into each -->
+      <path d="M365 110V186" fill="none" stroke="#8FAE66" stroke-width="1.1"
+            stroke-linecap="square"/>
+      <path d="M116 186H416" fill="none" stroke="#8FAE66" stroke-width="1.1"
+            stroke-linecap="square"/>
+      <path d="M116 186V262" fill="none" stroke="#8FAE66" stroke-width="1.1"
+            stroke-linecap="square" stroke-dasharray="4 3"/>
+      <path d="M416 186V262" fill="none" stroke="#8FAE66" stroke-width="1.1"
+            stroke-linecap="square"/>
+      <circle cx="365" cy="110" r="2" fill="#8FAE66"/>
+
+      <!-- marriage: a double rule, not a single line -->
+      <path d="M352 60.5h26M352 65.5h26" stroke="#B08A63" stroke-width="1.1"
+            stroke-linecap="round"/>
+      <path d="M214 302.5h26M214 307.5h26" stroke="#B08A63" stroke-width="1.1"
+            stroke-linecap="round"/>
+      <path d="M514 302.5h26M514 307.5h26" stroke="#B08A63" stroke-width="1.1"
+            stroke-linecap="round"/>
+    </svg>
+
+    <div class="card" style="left:180px; top:22px">
+      <span class="nm"><span class="sym"></span>Eshwar Datta Varma</span>
+      <span class="yrs">1928 – 2004</span>
+      <span class="kin">Paternal grandfather</span>
+    </div>
+    <div class="pill" style="left:378px; top:43px">
+      <span class="sym f" style="margin:0"></span>
+      <span><span class="pn">Girija</span><span class="pk">నానమ్మ</span></span>
+    </div>
+
+    <div class="card" style="left:30px; top:262px">
+      <span class="nm"><span class="sym"></span>Harinath Sharma</span>
+      <span class="yrs">no dates recorded</span>
+      <span class="kin">Father’s elder brother</span>
+    </div>
+    <div class="pill" style="left:214px; top:285px">
+      <span class="sym f" style="margin:0"></span>
+      <span><span class="pn">Kalyani</span><span class="pk">పెద్దమ్మ</span></span>
+    </div>
+
+    <div class="card" style="left:330px; top:262px">
+      <span class="nm"><span class="sym"></span>Chandra Mohan Babu</span>
+      <span class="yrs">b. 1958</span>
+      <span class="kin">Father</span>
+    </div>
+    <div class="pill" style="left:514px; top:285px">
+      <span class="sym f" style="margin:0"></span>
+      <span><span class="pn">Deepa</span><span class="pk">అమ్మ</span></span>
+    </div>
+  </div>
+
+  <!-- what is actually wrong today, measured -->
+  <div>
+    <p class="lbl">Why the current one looks wrong</p>
+    <div style="display:flex; gap:18px; align-items:flex-start">
+      <svg width="230" height="96" viewBox="0 0 230 96" style="flex:none; background:var(--surface);
+           border:1px solid var(--rule); border-radius:4px">
+        <rect x="86" y="10" width="58" height="18" rx="3" fill="#FAFBF7" stroke="#D3D9C6"/>
+        <path d="M115 28v14" stroke="#7FA352" stroke-width="2"/>
+        <path d="M37 42h156" stroke="#7FA352" stroke-width="2"/>
+        <path d="M56 42v14M174 42v14" stroke="#7FA352" stroke-width="2"/>
+        <rect x="27" y="56" width="58" height="18" rx="3" fill="#FAFBF7" stroke="#D3D9C6"/>
+        <rect x="145" y="56" width="58" height="18" rx="3" fill="#FAFBF7" stroke="#D3D9C6"/>
+        <path d="M37 42v-6M56 42v-6" stroke="#8F3F0A" stroke-width="1" stroke-dasharray="2 2"/>
+        <path d="M174 42v-6M193 42v-6" stroke="#8F3F0A" stroke-width="1" stroke-dasharray="2 2"/>
+        <text x="46" y="34" text-anchor="middle" font-size="8" fill="#8F3F0A">39px</text>
+        <text x="184" y="34" text-anchor="middle" font-size="8" fill="#8F3F0A">62px</text>
+      </svg>
+      <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.6">
+        The bar is drawn at fixed percentages &mdash; <code style="font-size:11.5px">left:16%;
+        right:16%</code> &mdash; rather than to the children it joins. Measured in the running
+        app it overshoots the left child by <strong>39px</strong> and the right by
+        <strong>62px</strong>, and unevenly, because each child block is a different width once
+        a spouse is attached. So it never quite lines up with the ticks below it, which is what
+        the eye is objecting to before it notices the weight.
+      </p>
+    </div>
+  </div>
+
+  <div style="padding:11px 13px; background:var(--sunk); border-radius:4px; font-size:12px;
+              color:var(--ink-2); line-height:1.6">
+    <strong>Why not curves.</strong> An S-curve only reads well when the drop is comparable to
+    the sideways run. Here the couple can sit 250px to the right of a child while only 150px
+    above them, so the curve swoops sideways like a cable rather than descending like a
+    lineage. Right angles are indifferent to that ratio, which is why every printed family
+    chart uses them. Descent stays olive; marriage takes a warm neutral, so the two are told
+    apart by colour as well as by form.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -760,7 +760,6 @@ function drawWires(): void {
     }
 
     const parts: string[] = [];
-    const feet: string[] = [];
 
     const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
     const married = new Set(state.graph.Unions.map((u) => pairKey(u.a, u.b)));
@@ -773,14 +772,23 @@ function drawWires(): void {
       byChild.set(link.child, list);
     }
 
+    // Gather by the couple (or lone parent) the children issue from, so one trunk and one
+    // sibling bar can serve all of them -- which is what a genealogy chart looks like.
+    interface Origin { x: number; y: number; kids: { x: number; y: number; dashed: boolean }[] }
+    const origins = new Map<string, Origin>();
+    const at = (key: string, x: number, y: number) => {
+      const found = origins.get(key) ?? { x, y, kids: [] };
+      found.y = Math.max(found.y, y);
+      origins.set(key, found);
+      return found;
+    };
+
     for (const [childId, links] of byChild) {
       const to = nodes.get(childId)!;
-
-      // A child of two married parents gets ONE line, leaving from between them. Drawing a
-      // line from each parent is just as true and looks like a tangle: with a spouse sitting
-      // to one side, the two lines cross over each other on the way down.
-      const origins: { x: number; y: number; adoptive: boolean }[] = [];
+      const cx = to.left + to.width / 2 - base.left;
+      const cy = to.top - base.top;
       const spent = new Set<number>();
+
       for (let i = 0; i < links.length; i++) {
         for (let j = i + 1; j < links.length; j++) {
           const a = links[i]!;
@@ -790,11 +798,10 @@ function drawWires(): void {
           const ra = nodes.get(a.parent)!;
           const rb = nodes.get(b.parent)!;
           const [l, r] = ra.left <= rb.left ? [ra, rb] : [rb, ra];
-          origins.push({
-            x: (l.right + r.left) / 2 - base.left,
-            y: Math.max(l.bottom, r.bottom) - base.top,
-            adoptive: a.role !== 'biological' || b.role !== 'biological',
-          });
+          at(pairKey(a.parent, b.parent), (l.right + r.left) / 2 - base.left,
+             Math.max(l.bottom, r.bottom) - base.top)
+            .kids.push({ x: cx, y: cy,
+                         dashed: a.role !== 'biological' || b.role !== 'biological' });
           spent.add(a.parent);
           spent.add(b.parent);
         }
@@ -802,33 +809,33 @@ function drawWires(): void {
       for (const link of links) {
         if (spent.has(link.parent)) continue;
         const from = nodes.get(link.parent)!;
-        origins.push({
-          x: from.left + from.width / 2 - base.left,
-          y: from.bottom - base.top,
-          adoptive: link.role !== 'biological',
-        });
-      }
-
-      const x2 = to.left + to.width / 2 - base.left;
-      const y2 = to.top - base.top;
-      for (const origin of origins) {
-        if (y2 <= origin.y - 4) continue;   // not stacked on this canvas
-        // A vertical tangent at both ends, so the line leaves the parents and meets the
-        // child square-on however far apart they are.
-        const bend = Math.max(16, (y2 - origin.y) * 0.55);
-        const dash = origin.adoptive ? ' stroke-dasharray="4 3"' : '';
-        parts.push(`<path d="M${origin.x} ${origin.y} C${origin.x} ${origin.y + bend}, `
-                 + `${x2} ${y2 - bend}, ${x2} ${y2}" fill="none" stroke="${DESCENT}" `
-                 + `stroke-width="1.25" stroke-linecap="round"${dash} />`);
-        feet.push(`${origin.x.toFixed(1)},${origin.y.toFixed(1)}`);
+        at(`p${link.parent}`, from.left + from.width / 2 - base.left, from.bottom - base.top)
+          .kids.push({ x: cx, y: cy, dashed: link.role !== 'biological' });
       }
     }
 
-    // A small stop where lines leave a couple, so several children read as one issue rather
-    // than as strands that happen to converge.
-    for (const foot of new Set(feet)) {
-      const [x, y] = foot.split(',');
-      parts.push(`<circle cx="${x}" cy="${y}" r="2.4" fill="${DESCENT}" />`);
+    for (const origin of origins.values()) {
+      const kids = origin.kids.filter((k) => k.y > origin.y + 6);
+      if (kids.length === 0) continue;
+
+      // The sibling bar sits midway down and spans exactly the children it joins -- measured,
+      // so it can never overshoot them the way a percentage did.
+      const bar = origin.y + (Math.min(...kids.map((k) => k.y)) - origin.y) / 2;
+      const left = Math.min(origin.x, ...kids.map((k) => k.x));
+      const right = Math.max(origin.x, ...kids.map((k) => k.x));
+
+      const stroke = `stroke="${DESCENT}" stroke-width="1.1" stroke-linecap="square"`;
+      parts.push(`<path d="M${origin.x} ${origin.y}V${bar}" fill="none" ${stroke} />`);
+      if (right - left > 0.5) {
+        parts.push(`<path d="M${left} ${bar}H${right}" fill="none" ${stroke} />`);
+      }
+      for (const kid of kids) {
+        // The shared trunk is shared; the role belongs to the individual link, so only the
+        // child's own drop is dashed.
+        const dash = kid.dashed ? ' stroke-dasharray="4 3"' : '';
+        parts.push(`<path d="M${kid.x} ${bar}V${kid.y}" fill="none" ${stroke}${dash} />`);
+      }
+      parts.push(`<circle cx="${origin.x}" cy="${origin.y}" r="2" fill="${DESCENT}" />`);
     }
 
     for (const union of state.graph.Unions) {

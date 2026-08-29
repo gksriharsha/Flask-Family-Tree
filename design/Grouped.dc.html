@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@400;500;600;700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;family=Noto+Serif+Telugu:wght@400;500;600&amp;display=swap">
+  <style>
+    :root {
+      --paper:#eff1ea; --surface:#fafbf7; --surface-2:#e7ebde; --sunk:#e2e7d6;
+      --ink:#1a1e15; --ink-2:#3d4636; --muted:#6b7563; --rule:#d3d9c6; --rule-soft:#e3e7d8;
+      --olive:#3f6d14; --olive-soft:#e4edd4; --olive-line:#7fa352;
+      --brown:#8f3f0a; --brown-soft:#f4e3d5;
+      --serif:'Faustina','Iowan Old Style',Georgia,serif;
+      --sans:'Source Sans 3','Helvetica Neue',Arial,'Noto Serif Telugu',sans-serif;
+      --telugu:'Noto Serif Telugu','Faustina',serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:14px; line-height:1.5;
+           -webkit-font-smoothing:antialiased; }
+    a { color:#1261bb; text-decoration:none; }
+    a:hover { color:#0e4e96; text-decoration:underline; }
+    .card { width:172px; padding:9px 10px 10px; background:var(--surface);
+            border:1px solid var(--rule); border-radius:4px; }
+    .nm { display:block; font-family:var(--serif); font-size:14.5px; font-weight:600;
+          line-height:1.2; }
+    .yrs { display:block; margin:3px 0 8px; font-size:11.5px; color:var(--muted); }
+    .kin { display:inline-flex; padding:3px 7px; font-size:11px; font-weight:600;
+           color:var(--olive); background:var(--olive-soft); border-radius:3px; }
+    .sym { display:inline-block; width:8px; height:8px; margin-right:6px;
+           border:1.5px solid var(--muted); vertical-align:1px; }
+    .sym.f { border-radius:50%; }
+    .pill { display:inline-flex; align-items:center; gap:6px; height:40px; padding:0 11px;
+            border:1px solid var(--rule); border-radius:20px; background:var(--surface-2); }
+    .pn { display:block; font-size:11.5px; font-weight:600; line-height:1.25; }
+    .pk { display:block; font-family:var(--telugu); font-size:11px; color:var(--muted);
+          line-height:1.3; }
+  </style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:22px; width:680px; padding:26px 24px 30px">
+
+  <div>
+    <h2 style="margin:0 0 4px; font-family:var(--serif); font-size:21px; font-weight:600">Grouped</h2>
+    <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.55; max-width:58ch">
+      No descent lines at all. The couple heads a panel and their children sit inside it, so
+      the relationship is carried by containment rather than by drawing. Nothing can misalign
+      because there is nothing to align.
+    </p>
+  </div>
+
+  <!-- the household as one object -->
+  <div style="padding:16px 18px 18px; background:var(--olive-soft);
+              border:1px solid var(--olive-line); border-radius:8px">
+    <div style="display:flex; align-items:center; gap:14px">
+      <div class="card" style="background:var(--surface)">
+        <span class="nm"><span class="sym"></span>Eshwar Datta Varma</span>
+        <span class="yrs">1928 – 2004</span>
+        <span class="kin">Paternal grandfather</span>
+      </div>
+      <svg width="26" height="16" style="flex:none" aria-hidden="true">
+        <path d="M0 5.5h26M0 10.5h26" stroke="#B08A63" stroke-width="1.1" stroke-linecap="round"/>
+      </svg>
+      <span class="pill">
+        <span class="sym f" style="margin:0"></span>
+        <span><span class="pn">Girija</span><span class="pk">నానమ్మ</span></span>
+      </span>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:9px; margin:15px 0 11px">
+      <span style="font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+                   color:var(--olive)">Their children</span>
+      <span style="flex:1; height:1px; background:var(--olive-line); opacity:.5"></span>
+    </div>
+
+    <div style="display:flex; gap:14px">
+      <div style="display:flex; align-items:center; gap:9px">
+        <div class="card" style="border-style:dashed; border-color:var(--brown)">
+          <span class="nm"><span class="sym"></span>Harinath Sharma</span>
+          <span class="yrs">no dates recorded</span>
+          <span class="kin">Father’s elder brother</span>
+        </div>
+        <span class="pill" style="height:34px">
+          <span class="sym f" style="margin:0"></span>
+          <span><span class="pn">Kalyani</span></span>
+        </span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px">
+        <div class="card">
+          <span class="nm"><span class="sym"></span>Chandra Mohan Babu</span>
+          <span class="yrs">b. 1958</span>
+          <span class="kin">Father</span>
+        </div>
+        <span class="pill" style="height:34px">
+          <span class="sym f" style="margin:0"></span>
+          <span><span class="pn">Deepa</span></span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:11px 13px; background:var(--sunk); border-radius:4px; font-size:12px;
+              color:var(--ink-2); line-height:1.6">
+    <strong>Why it suits this app in particular.</strong> The lineage view already shows one
+    generation at a time, so there is only ever one panel on screen &mdash; the nesting that
+    makes containment collapse on a full tree never happens here. An adoptive child keeps the
+    dashed border it already has, which is the only place a line was doing real work.
+    <br /><br />
+    <strong>The trade.</strong> It reads as a household rather than a descent: with the lines
+    gone, nothing says the two people at the top are the parents rather than simply the eldest
+    in the group. The heading has to say it, and it does.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

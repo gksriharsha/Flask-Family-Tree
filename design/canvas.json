@@ -122,28 +122,55 @@
     {
       "file": "Connectors.dc.html",
       "x": 0,
-      "y": 0,
+      "y": 1000,
       "w": 680,
       "h": 860,
-      "title": "Drawn — recommended",
+      "title": "Drawn — tried, rejected",
       "page": "page-4"
     },
     {
       "file": "Elbow.dc.html",
       "x": 800,
-      "y": 0,
+      "y": 1000,
       "w": 680,
       "h": 640,
-      "title": "Ledger — alternate",
+      "title": "Ledger — superseded by Trunk",
       "page": "page-4"
     },
     {
       "file": "Marriage.dc.html",
-      "x": 1600,
+      "x": 2320,
       "y": 0,
       "w": 520,
       "h": 900,
       "title": "Marriage, four ways",
+      "page": "page-4"
+    },
+    {
+      "file": "Trunk.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 680,
+      "h": 860,
+      "title": "Trunk — shipped",
+      "page": "page-4"
+    },
+    {
+      "file": "Grouped.dc.html",
+      "x": 800,
+      "y": 0,
+      "w": 680,
+      "h": 620,
+      "title": "Grouped — no lines at all",
+      "page": "page-4"
+    },
+    {
+      "file": "Register.dc.html",
+      "x": 1600,
+      "y": 0,
+      "w": 620,
+      "h": 700,
+      "title": "Register — not a chart",
       "page": "page-4"
     }
   ],
@@ -234,7 +261,7 @@
       "y": -210,
       "w": 680,
       "page": "page-4",
-      "text": "The green lines are not only heavy — they are drawn to fixed percentages (left:16%, right:16%) rather than to the children they join. Measured in the running app the bar overshoots the left child by 39px and the right by 62px, unevenly, because each child block is a different width once a spouse is attached.\nSo the fix is structural, not cosmetic: draw each line to the child it actually connects, and give marriage a mark of its own kind."
+      "text": "The bar used to be drawn at fixed percentages rather than to the children it joins — it overshot the left child by 39px and the right by 62px. Trunk is now shipped and measured: zero overshoot on both sides.\nCurves were tried first and rejected. An S-curve only reads well when the drop is comparable to the sideways run, and here a couple can sit 250px right of a child while only 150px above them — so it swooped like a cable instead of descending like a lineage. Both attempts are kept below."
     }
   ],
   "launch": {

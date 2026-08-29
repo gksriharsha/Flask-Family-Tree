@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;1,400&amp;family=Source+Sans+3:wght@400;500;600;700&amp;family=Noto+Serif+Telugu:wght@400;500;600&amp;display=swap">
+  <style>
+    :root {
+      --paper:#eff1ea; --surface:#fafbf7; --surface-2:#e7ebde; --sunk:#e2e7d6;
+      --ink:#1a1e15; --ink-2:#3d4636; --muted:#6b7563; --rule:#d3d9c6; --rule-soft:#e3e7d8;
+      --olive:#3f6d14; --olive-soft:#e4edd4; --olive-line:#7fa352;
+      --brown:#8f3f0a; --brown-soft:#f4e3d5;
+      --serif:'Faustina','Iowan Old Style',Georgia,serif;
+      --sans:'Source Sans 3','Helvetica Neue',Arial,'Noto Serif Telugu',sans-serif;
+      --telugu:'Noto Serif Telugu','Faustina',serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:14px; line-height:1.5;
+           -webkit-font-smoothing:antialiased; }
+    a { color:#1261bb; text-decoration:none; }
+    a:hover { color:#0e4e96; text-decoration:underline; }
+    .sym { display:inline-block; width:8px; height:8px; border:1.5px solid var(--muted); }
+    .sym.f { border-radius:50%; }
+    .entry { display:flex; align-items:baseline; gap:10px; padding:11px 0;
+             border-bottom:1px solid var(--rule-soft); }
+    .ord { flex:none; width:22px; font-family:var(--serif); font-size:15px; font-style:italic;
+           color:var(--olive); text-align:right; }
+    .who { flex:1; min-width:0; }
+    .who .n { font-family:var(--serif); font-size:15.5px; font-weight:600; }
+    .who .t { margin-left:8px; font-family:var(--telugu); font-size:13px; color:var(--ink-2); }
+    .who .d { display:block; margin-top:2px; font-size:11.5px; color:var(--muted); }
+    .sp { flex:none; display:inline-flex; align-items:baseline; gap:6px; font-size:12px;
+          color:var(--ink-2); }
+    .go { flex:none; font-size:11.5px; font-weight:600; color:var(--olive); }
+  </style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:22px; width:620px; padding:26px 24px 30px">
+
+  <div>
+    <h2 style="margin:0 0 4px; font-family:var(--serif); font-size:21px; font-weight:600">Register</h2>
+    <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.55; max-width:56ch">
+      Not a chart at all. The generation in focus is set as a page from a family register:
+      the couple as a heading, their children as numbered entries beneath it. Descent is
+      carried by the heading and the numbering, so no lines are drawn.
+    </p>
+  </div>
+
+  <div style="padding:20px 22px 14px; background:var(--surface); border:1px solid var(--rule);
+              border-radius:5px">
+
+    <!-- the couple, as a heading -->
+    <div style="display:flex; align-items:baseline; gap:10px">
+      <span class="sym" style="align-self:center"></span>
+      <span style="font-family:var(--serif); font-size:19px; font-weight:600">Eshwar Datta Varma</span>
+      <span style="font-family:var(--telugu); font-size:14px; color:var(--ink-2)">తాత</span>
+      <span style="margin-left:auto; font-size:12px; color:var(--muted)">1928 – 2004</span>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:10px; margin-top:5px">
+      <svg width="14" height="10" style="align-self:center" aria-hidden="true">
+        <path d="M0 3h14M0 7h14" stroke="#B08A63" stroke-width="1.1" stroke-linecap="round"/>
+      </svg>
+      <span class="sym f" style="align-self:center"></span>
+      <span style="font-family:var(--serif); font-size:16px; font-weight:500">Girija Sharma</span>
+      <span style="font-family:var(--telugu); font-size:13px; color:var(--ink-2)">నానమ్మ</span>
+      <span style="margin-left:auto; font-size:12px; color:var(--muted)">1932 – 2011</span>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:10px; margin:16px 0 4px">
+      <span style="font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+                   color:var(--muted)">Children</span>
+      <span style="flex:1; height:0; border-top:1px solid var(--rule)"></span>
+      <span style="flex:none; height:0; width:100%; max-width:0"></span>
+    </div>
+    <div style="height:3px; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+                margin-bottom:2px"></div>
+
+    <div class="entry">
+      <span class="ord">i.</span>
+      <span class="sym" style="align-self:center"></span>
+      <span class="who">
+        <span class="n">Harinath Sharma</span>
+        <span class="t">పెద్దనాన్న</span>
+        <span class="d">no dates recorded &middot; adopted into this line</span>
+      </span>
+      <span class="sp">
+        <svg width="12" height="9" aria-hidden="true">
+          <path d="M0 2.5h12M0 6.5h12" stroke="#B08A63" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+        Kalyani
+      </span>
+      <span class="go">2 children &rsaquo;</span>
+    </div>
+
+    <div class="entry" style="border-bottom:0">
+      <span class="ord">ii.</span>
+      <span class="sym" style="align-self:center"></span>
+      <span class="who">
+        <span class="n">Chandra Mohan Babu Varma</span>
+        <span class="t">నాన్న</span>
+        <span class="d">b. 1958</span>
+      </span>
+      <span class="sp">
+        <svg width="12" height="9" aria-hidden="true">
+          <path d="M0 2.5h12M0 6.5h12" stroke="#B08A63" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+        Deepa Latha
+      </span>
+      <span class="go">2 children &rsaquo;</span>
+    </div>
+  </div>
+
+  <div style="padding:11px 13px; background:var(--sunk); border-radius:4px; font-size:12px;
+              color:var(--ink-2); line-height:1.6">
+    <strong>What it buys.</strong> Ten siblings cost ten rows instead of a canvas three
+    screens wide, the birth order is stated rather than implied by position, and every name
+    gets its full width &mdash; so no more truncated cards. It is also the only one of these
+    that would print.
+    <br /><br />
+    <strong>The trade, and it is a real one.</strong> This stops being a tree. The
+    left-to-right shape that makes a family chart readable at a glance is gone, and with it
+    the sense of a line running down the page. It would want to be a view you switch to, beside
+    Lineage and View all, rather than a replacement for either.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
