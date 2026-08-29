@@ -1,0 +1,315 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:ital,wght@0,400;0,500;0,600;0,700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;family=Noto+Serif+Telugu:wght@400;500;600&amp;display=swap">
+  <style>
+    :root {
+      --paper:#eff1ea; --surface:#fafbf7; --surface-2:#e7ebde; --sunk:#e2e7d6;
+      --ink:#1a1e15; --ink-2:#3d4636; --muted:#6b7563; --rule:#d3d9c6; --rule-soft:#e3e7d8;
+      --olive:#3f6d14; --olive-soft:#e4edd4; --olive-line:#7fa352;
+      --brown:#8f3f0a; --brown-soft:#f4e3d5;
+      --blue:#1261bb; --blue-soft:#dce8f7;
+      --serif:'Faustina','Iowan Old Style',Georgia,serif;
+      --sans:'Source Sans 3','Helvetica Neue',Arial,'Noto Serif Telugu',sans-serif;
+      --telugu:'Noto Serif Telugu','Faustina',serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:15px; line-height:1.5;
+           -webkit-font-smoothing:antialiased; }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { color:#0e4e96; text-decoration:underline; }
+    button { font:inherit; color:inherit; cursor:pointer; }
+    .lbl { margin:0 0 9px; font-size:10px; font-weight:700; letter-spacing:.12em;
+           text-transform:uppercase; color:var(--muted); }
+    .te { font-family:var(--telugu); }
+  </style>
+</helmet>
+
+<div style="display:grid; grid-template-rows:auto 1fr; width:1440px; height:900px; overflow:hidden">
+
+  <header style="display:flex; align-items:center; gap:18px; height:60px; padding:0 18px;
+                 background:var(--surface); border-bottom:1px solid var(--rule); flex:none">
+    <div style="display:flex; align-items:center; gap:9px; font-family:var(--serif);
+                font-size:18px; font-weight:600; white-space:nowrap">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 21V11" stroke="#3F6D14" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M12 11C12 6.5 8.5 3.5 4.5 3.5c0 4.5 3 7.5 7.5 7.5Z" stroke="#3F6D14" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M12 14c0-3.6 2.8-6 6-6 0 3.6-2.4 6-6 6Z" stroke="#7FA352" stroke-width="1.7" stroke-linejoin="round"/>
+      </svg>
+      <span>Family Tree</span>
+    </div>
+    <div style="position:relative; flex:1; max-width:420px">
+      <input placeholder="Search names in either script — Varma, వర్మ"
+             style="width:100%; height:34px; padding:0 10px; border:1px solid var(--rule);
+                    border-radius:3px; background:var(--paper); font:inherit; font-size:13px" />
+    </div>
+    <div style="display:inline-flex; border:1px solid var(--rule); border-radius:3px;
+                overflow:hidden; background:var(--paper)">
+      <button style="height:32px; padding:0 12px; border:none; background:none; font-size:12px;
+                     font-weight:600; color:var(--muted)">Lineage</button>
+      <button style="height:32px; padding:0 12px; border:none; background:var(--blue); color:#fff;
+                     font-size:12px; font-weight:600; border-left:1px solid var(--rule)">View all</button>
+    </div>
+    <span style="margin-left:auto"></span>
+    <span style="font-size:12px; color:var(--muted); white-space:nowrap">29 people · 9 unions</span>
+  </header>
+
+  <div style="display:grid; grid-template-columns:236px 1fr 332px; min-height:0">
+
+    <aside style="background:var(--surface); border-right:1px solid var(--rule); overflow:auto">
+      <div style="padding:18px">
+        <p class="lbl">Viewing</p>
+        <div style="padding:11px 12px; background:var(--surface-2); border:1px solid var(--rule);
+                    border-radius:4px">
+          <div style="font-family:var(--serif); font-size:15px; font-weight:600">Every branch</div>
+          <div style="margin-top:5px; font-size:11.5px; color:var(--ink-2)">
+            All 29 people, 4 generations. Drag to move, zoom to read.</div>
+        </div>
+        <div style="margin-top:16px; padding:9px 10px; background:var(--sunk); border-radius:3px;
+                    font-size:11.5px; color:var(--ink-2); line-height:1.55">
+          Your own line stays outlined in olive wherever it runs, so you keep your place while
+          you move around.
+        </div>
+        <div style="margin-top:22px; padding-top:20px; border-top:1px solid var(--rule-soft)">
+          <p class="lbl">Zoom</p>
+          <div style="display:flex; gap:6px">
+            <button onClick="{{ zoomOut }}" style="{{ zoomBtn }}">&minus;</button>
+            <button onClick="{{ zoomReset }}" style="{{ zoomBtnWide }}">{{ zoomLabel }}</button>
+            <button onClick="{{ zoomIn }}" style="{{ zoomBtn }}">+</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main style="position:relative; overflow:hidden; background:var(--paper);
+                 background-image:radial-gradient(var(--rule-soft) 1px, transparent 1px);
+                 background-size:22px 22px; {{ grabStyle }}"
+          onMouseDown="{{ panStart }}" onMouseMove="{{ panMove }}"
+          onMouseUp="{{ panEnd }}" onMouseLeave="{{ panEnd }}">
+
+      <div style="position:absolute; inset:0; {{ panTransform }}">
+        <div style="padding:34px 40px 60px; min-width:max-content">
+
+          <sc-for list="{{ generations }}" as="gen" hint-placeholder-count="4">
+            <div style="{{ gen.rowStyle }}">
+              <span style="{{ gen.labelStyle }}">{{ gen.label }}</span>
+              <div style="display:flex; align-items:flex-start; gap:{{ gen.gap }}">
+                <sc-for list="{{ gen.groups }}" as="grp" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:stretch">
+                    <sc-for list="{{ grp.members }}" as="m" hint-placeholder-count="2">
+                      <div style="display:flex; align-items:stretch">
+                        <span style="{{ m.knotStyle }}"></span>
+                        <button style="{{ m.cardStyle }}">
+                          <span style="{{ m.chipStyle }}">{{ m.chipText }}</span>
+                          <span style="display:flex; align-items:baseline; gap:5px">
+                            <span style="{{ m.symStyle }}"></span>
+                            <span>
+                              <span style="display:block; font-family:var(--serif); font-size:13px;
+                                           font-weight:600; line-height:1.2">{{ m.n }}</span>
+                              <span class="te" style="display:block; font-size:11.5px;
+                                           color:var(--ink-2); line-height:1.3">{{ m.te }}</span>
+                            </span>
+                          </span>
+                          <span style="display:block; margin-top:3px; font-size:10.5px;
+                                       color:var(--muted); font-variant-numeric:tabular-nums">{{ m.yrs }}</span>
+                        </button>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:16px; bottom:16px; display:flex; align-items:center; gap:8px;
+                  padding:6px 10px; background:rgba(250,251,247,.94); border:1px solid var(--rule);
+                  border-radius:20px; font-size:11.5px; color:var(--muted)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"
+                stroke="#6B7563" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Drag anywhere to move the tree
+      </div>
+      <button onClick="{{ recentre }}"
+              style="position:absolute; right:16px; bottom:16px; height:30px; padding:0 12px;
+                     background:var(--surface); border:1px solid var(--rule); border-radius:15px;
+                     font-size:11.5px; font-weight:600; color:var(--ink-2)">Recentre</button>
+    </main>
+
+    <aside style="background:var(--surface); border-left:1px solid var(--rule); overflow:auto">
+      <div style="padding:18px">
+        <p class="lbl">Selected</p>
+        <div style="font-family:var(--serif); font-size:19px; font-weight:600; line-height:1.15">Aditya Varun Varma</div>
+        <div class="te" style="margin-top:2px; font-size:15px; color:var(--ink-2)">ఆదిత్య వరుణ్ వర్మ</div>
+        <div style="margin-top:5px; font-size:11.5px; color:var(--muted)">b. 1990 · male</div>
+
+        <div style="margin-top:16px; padding:11px 13px; border-left:3px solid var(--olive-line);
+                    border-radius:0 3px 3px 0; background:var(--olive-soft); font-size:12.5px;
+                    color:#2b4a0e; line-height:1.55">
+          View all is for orientation &mdash; finding a branch, spotting a gap. Go back to
+          <strong>Lineage</strong> to read one line properly.
+        </div>
+
+        <p class="lbl" style="margin-top:20px">Actions</p>
+        <div style="display:flex; flex-direction:column; gap:8px">
+          <button style="display:flex; align-items:center; justify-content:center; gap:7px;
+                         width:100%; height:36px; border:1px solid var(--blue); border-radius:3px;
+                         background:var(--blue); color:#fff; font-size:13px; font-weight:600">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            Add a relative
+          </button>
+          <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px">
+            <button style="display:flex; align-items:center; justify-content:center; gap:6px;
+                           height:34px; border:1px solid var(--rule); border-radius:3px;
+                           background:var(--surface); color:var(--blue); font-size:12.5px;
+                           font-weight:600">Edit details</button>
+            <button style="display:flex; align-items:center; justify-content:center; gap:6px;
+                           height:34px; border:1px solid var(--rule); border-radius:3px;
+                           background:var(--surface); color:var(--olive); font-size:12.5px;
+                           font-weight:600">Show line</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{
+  "zoom": {"editor":"range","min":0.6,"max":1.15,"step":0.05,"default":0.85,"section":"Canvas"}
+}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pan: { x: 0, y: 0 }, drag: null, z: null };
+  }
+
+  zoom() { return this.state.z ?? this.props.zoom ?? 0.85; }
+
+  panStart(e) {
+    this.setState({ drag: { sx: e.clientX, sy: e.clientY,
+                            ox: this.state.pan.x, oy: this.state.pan.y } });
+  }
+  panMove(e) {
+    const d = this.state.drag;
+    if (!d) return;
+    this.setState({ pan: { x: d.ox + (e.clientX - d.sx), y: d.oy + (e.clientY - d.sy) } });
+  }
+  panEnd() { if (this.state.drag) this.setState({ drag: null }); }
+
+  card(m) {
+    const border = m.adopted ? '1px dashed #8F3F0A'
+                 : m.you ? '1px solid #1261BB'
+                 : m.line ? '1px solid #7FA352' : '1px solid #D3D9C6';
+    return 'position:relative; display:flex; flex-direction:column; align-items:flex-start;'
+         + 'width:152px; padding:8px 9px 9px; background:#FAFBF7; border:' + border + ';'
+         + 'border-radius:4px; text-align:left;'
+         + (m.you ? 'box-shadow:0 0 0 2px #DCE8F7;' : '');
+  }
+
+  renderVals() {
+    const z = this.zoom();
+
+    // Four generations. `line` marks the reader's own descent so it stays findable
+    // however far the canvas is dragged.
+    const gens = [
+      { label: 'Great-grandparents', gap: '58px', groups: [
+        { members: [
+          { n:'Ishwar Varma', te:'ఈశ్వర్ వర్మ', yrs:'1901 – 1974' },
+          { n:'Jaya Varma', te:'జయ వర్మ', yrs:'1905 – 1981', x:'F', knot:true } ] } ] },
+
+      { label: 'Grandparents', gap: '58px', groups: [
+        { members: [
+          { n:'Eshwar Datta Varma', te:'ఈశ్వర్ దత్త వర్మ', yrs:'1928 – 2004', line:true },
+          { n:'Girija Sharma', te:'గిరిజ శర్మ', yrs:'1932 – 2011', x:'F', knot:true } ] },
+        { members: [
+          { n:'Madhava Varma', te:'మాధవ వర్మ', yrs:'no dates' },
+          { n:'Nirmala Varma', te:'నిర్మల వర్మ', yrs:'b. 1957', x:'F', knot:true } ] } ] },
+
+      { label: 'Parents and their siblings', gap: '30px', groups: [
+        { members: [
+          { n:'Harinath Sharma', te:'హరినాథ్ శర్మ', yrs:'no dates', adopted:true, chip:'ADOPTED' },
+          { n:'Kalyani Naidu', te:'కళ్యాణి నాయుడు', yrs:'b. 1959', x:'F', knot:true } ] },
+        { members: [
+          { n:'Chandra Mohan Babu', te:'చంద్ర మోహన్ బాబు', yrs:'b. 1958', line:true },
+          { n:'Deepa Latha Reddy', te:'దీప లత రెడ్డి', yrs:'b. 1962', x:'F', knot:true } ] },
+        { members: [
+          { n:'Yeshwanth Varma', te:'యశ్వంత్ వర్మ', yrs:'b. 1964' },
+          { n:'Bhavani Varma', te:'భవాని వర్మ', yrs:'b. 1966', x:'F', knot:true } ] },
+        { members: [
+          { n:'Dinesh Chowdary', te:'దినేష్ చౌదరి', yrs:'b. 1957' },
+          { n:'Gowri Varma', te:'గౌరి వర్మ', yrs:'b. 1961', x:'F', knot:true } ] } ] },
+
+      { label: 'Your generation', gap: '22px', groups: [
+        { members: [ { n:'Lokesh Sharma', te:'లోకేష్ శర్మ', yrs:'b. 1991' } ] },
+        { members: [ { n:'Manoj Sharma', te:'మనోజ్ శర్మ', yrs:'b. 1995' } ] },
+        { members: [ { n:'Aditya Varun Varma', te:'ఆదిత్య వరుణ్ వర్మ', yrs:'b. 1990',
+                       you:true, chip:'YOU' } ] },
+        { members: [ { n:'Bharath Kiran Varma', te:'భరత్ కిరణ్ వర్మ', yrs:'b. 1993' } ] },
+        { members: [ { n:'Chandana Sri Varma', te:'చందన శ్రీ వర్మ', yrs:'b. 1992', x:'F' } ] },
+        { members: [ { n:'Hema Chowdary', te:'హేమ చౌదరి', yrs:'b. 1986', x:'F' } ] },
+        { members: [ { n:'Indira Chowdary', te:'ఇందిర చౌదరి', yrs:'b. 1989', x:'F' } ] } ] }
+    ];
+
+    const generations = gens.map((g, gi) => ({
+      label: g.label,
+      gap: g.gap,
+      rowStyle: 'position:relative; padding:' + (gi === 0 ? '0' : '34px') + ' 0 0;',
+      labelStyle: 'display:block; margin-bottom:10px; font-size:10px; font-weight:700;'
+                + 'letter-spacing:.12em; text-transform:uppercase; color:#6B7563;',
+      groups: g.groups.map((grp) => ({
+        members: grp.members.map((m) => ({
+          n: m.n, te: m.te, yrs: m.yrs,
+          cardStyle: this.card(m),
+          symStyle: 'flex:none; width:8px; height:8px; margin-top:4px; border:1.5px solid #6B7563;'
+                  + (m.x === 'F' ? 'border-radius:50%;' : ''),
+          knotStyle: m.knot
+            ? 'flex:none; align-self:center; width:18px; height:0; border-top:2px solid #D3D9C6;'
+            : 'display:none;',
+          chipText: m.chip || '',
+          chipStyle: m.chip
+            ? 'position:absolute; top:-9px; ' + (m.you ? 'left:8px;' : 'right:8px;')
+              + 'display:inline-flex; align-items:center; height:16px; padding:0 5px;'
+              + 'font-size:9.5px; font-weight:700; letter-spacing:.06em; border-radius:3px;'
+              + (m.you ? 'color:#fff; background:#3F6D14;'
+                       : 'color:#8F3F0A; background:#F4E3D5; border:1px solid #8F3F0A;')
+            : 'display:none;'
+        }))
+      }))
+    }));
+
+    const zb = 'height:30px; border:1px solid #D3D9C6; border-radius:3px; background:#FAFBF7;'
+             + 'font-size:13px; font-weight:600; color:#3D4636;';
+
+    return {
+      generations,
+      grabStyle: this.state.drag ? 'cursor:grabbing;' : 'cursor:grab;',
+      panTransform: 'transform: translate(' + this.state.pan.x + 'px,' + this.state.pan.y
+                  + 'px) scale(' + z + '); transform-origin: 0 0;',
+      panStart: (e) => this.panStart(e),
+      panMove: (e) => this.panMove(e),
+      panEnd: () => this.panEnd(),
+      recentre: () => this.setState({ pan: { x: 0, y: 0 } }),
+      zoomIn: () => this.setState({ z: Math.min(1.15, z + 0.05) }),
+      zoomOut: () => this.setState({ z: Math.max(0.6, z - 0.05) }),
+      zoomReset: () => this.setState({ z: null }),
+      zoomLabel: Math.round(z * 100) + '%',
+      zoomBtn: 'flex:none; width:34px; ' + zb,
+      zoomBtnWide: 'flex:1; ' + zb
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,99 +1,166 @@
 {
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Lineage & panel"
+    },
+    {
+      "id": "page-2",
+      "name": "Earlier screens"
+    }
+  ],
   "artboards": [
     {
       "file": "Main.dc.html",
       "x": 0,
       "y": 0,
-      "w": 1760,
+      "w": 1440,
       "h": 900,
-      "title": "Tree — the thing this app has never had"
+      "title": "Lineage — the default view",
+      "is_interactive": true,
+      "page": "page-1"
+    },
+    {
+      "file": "ViewAll.dc.html",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "View all — every branch",
+      "is_interactive": true,
+      "page": "page-1"
+    },
+    {
+      "file": "RightPanel.dc.html",
+      "x": 3120,
+      "y": 0,
+      "w": 380,
+      "h": 1060,
+      "title": "Right panel buttons, at size",
+      "page": "page-1"
     },
     {
       "file": "Person.dc.html",
       "x": 0,
-      "y": 1020,
+      "y": 0,
       "w": 1180,
       "h": 1180,
-      "title": "Person record"
+      "title": "Person record",
+      "page": "page-2"
     },
     {
       "file": "AddPerson.dc.html",
       "x": 1260,
-      "y": 1020,
+      "y": 0,
       "w": 780,
       "h": 1620,
-      "title": "Add a person"
+      "title": "Add a person",
+      "page": "page-2"
     },
     {
       "file": "Photo.dc.html",
       "x": 0,
-      "y": 2760,
+      "y": 1740,
       "w": 1100,
       "h": 1000,
-      "title": "Photo tagging"
+      "title": "Photo tagging",
+      "page": "page-2"
     },
     {
       "file": "Mobile.dc.html",
       "x": 1180,
-      "y": 2760,
+      "y": 1740,
       "w": 390,
       "h": 844,
-      "title": "Phone"
+      "title": "Phone",
+      "page": "page-2"
     },
     {
       "file": "Vocabulary.dc.html",
       "x": 1650,
-      "y": 2760,
+      "y": 1740,
       "w": 940,
       "h": 1000,
-      "title": "Family vocabulary"
+      "title": "Family vocabulary",
+      "page": "page-2"
     }
   ],
   "annotations": [
     {
+      "id": "note-lineage",
+      "x": 0,
+      "y": -190,
+      "w": 560,
+      "page": "page-1",
+      "text": "DEFAULT VIEW.\nThe focus person sits alone at the top with their spouse as a small pill; their CHILDREN are the full-size row underneath — the generation you are actually reading.\nClick a child to descend: they become the focus and their own children become the new row. The left rail walks the same line back up.\nDrag anywhere on the canvas to move the tree."
+    },
+    {
+      "id": "note-viewall",
+      "x": 1560,
+      "y": -190,
+      "w": 520,
+      "page": "page-1",
+      "text": "OPT-IN ONLY.\nEverything at once, for orientation — finding a branch or spotting a gap, not for reading a line.\nYour own descent stays outlined in olive wherever it runs, so you keep your place while dragging. Same drag-to-move canvas, plus zoom."
+    },
+    {
+      "id": "note-buttons",
+      "x": 3120,
+      "y": -190,
+      "w": 380,
+      "page": "page-1",
+      "text": "Today three equal buttons share 296px, so two labels wrap and none reads as primary.\nProposed: one filled primary, two real peers on an equal grid, and the reference-point action given its own wide row with a subtitle — because it silently rewrites every label in the tree."
+    },
+    {
       "id": "brief",
-      "x": -350,
+      "x": -360,
       "y": 0,
       "w": 300,
-      "text": "MATCHED FROM THE EXISTING APP\n\nKept: blue #1261bb for anything interactive, orange for warnings, olive and brown from _colorspace.scss, the underline-only inputs (no radius, no shadow), the leaf mark.\n\nChanged: olive and brown promoted from decoration to the primary voice; the flat #f2f2f2 ground warmed toward the olive; Faustina + Source Sans 3 + Noto Serif Telugu instead of Bootstrap defaults.\n\nSAMPLE DATA. The people and the relationships are real — taken from the project's own 29-person seed fixture. The birth years are NOT: the fixture records the same placeholder date for everyone, so the years here are invented sample values, and the two people whose seniority matters most are left with no year at all so you can see what the app does about it."
+      "text": "MATCHED FROM THE EXISTING APP\n\nKept: blue #1261bb for anything interactive, orange for warnings, olive and brown from _colorspace.scss, the underline-only inputs (no radius, no shadow), the leaf mark.\n\nChanged: olive and brown promoted from decoration to the primary voice; the flat #f2f2f2 ground warmed toward the olive; Faustina + Source Sans 3 + Noto Serif Telugu instead of Bootstrap defaults.\n\nSAMPLE DATA. The people and the relationships are real — taken from the project's own 29-person seed fixture. The birth years are NOT: the fixture records the same placeholder date for everyone, so the years here are invented sample values, and the two people whose seniority matters most are left with no year at all so you can see what the app does about it.",
+      "page": "page-1"
     },
     {
       "id": "kinship",
       "x": -350,
-      "y": 430,
+      "y": 0,
       "w": 300,
-      "text": "THE ONE IDEA WORTH THE MOST\n\nThis prototype runs the real algorithm, not a lookup table: nearest common ancestor → a canonical struct (degree, removal, side, parallel-vs-cross, seniority) → two independent renderers.\n\nIt returns EVERY genuine relationship, not the closest one — 45 pairs in this small tree are related more than one way, because one within-family adoption propagates down a whole line.\n\nSeven people here are all \"First cousin\" in English. In Telugu they take five different words — Thammudu, Akka, Annayya, Vadina, Chelli — because Telugu splits parallel cousins from cross cousins and elder from younger.\n\nSENIORITY IS A THREE-STATE ANSWER. Every person in the project's seed graph carries the same placeholder date, 1990-01-01, so for most pairs the birth order is simply not recorded. English copes: \"Brother\", \"Father's brother\". Telugu cannot — so the record shows the pair, Annayya / Thammudu, and asks for the one fact it needs. Select Harinath and answer the question in the right rail: every label that depends on it re-resolves at once."
+      "text": "THE ONE IDEA WORTH THE MOST\n\nThis prototype runs the real algorithm, not a lookup table: nearest common ancestor → a canonical struct (degree, removal, side, parallel-vs-cross, seniority) → two independent renderers.\n\nIt returns EVERY genuine relationship, not the closest one — 45 pairs in this small tree are related more than one way, because one within-family adoption propagates down a whole line.\n\nSeven people here are all \"First cousin\" in English. In Telugu they take five different words — Thammudu, Akka, Annayya, Vadina, Chelli — because Telugu splits parallel cousins from cross cousins and elder from younger.\n\nSENIORITY IS A THREE-STATE ANSWER. Every person in the project's seed graph carries the same placeholder date, 1990-01-01, so for most pairs the birth order is simply not recorded. English copes: \"Brother\", \"Father's brother\". Telugu cannot — so the record shows the pair, Annayya / Thammudu, and asks for the one fact it needs. Select Harinath and answer the question in the right rail: every label that depends on it re-resolves at once.",
+      "page": "page-2"
     },
     {
       "id": "dates",
       "x": 2130,
-      "y": 1020,
+      "y": 0,
       "w": 290,
-      "text": "WHY THE DATE CONTROL IS THE BIGGEST FIX\n\nThe current form demands yyyy-MM-dd, parses it strictly, and clamps the year to 1900 or later. So \"about 1955\", \"before 1962\", and a bare year cannot be entered at all — and no ancestor born before 1900 can be added.\n\nThat is how family trees fill up with invented 1 January dates.\n\nClick through the seven modes: each changes the inputs, and shows exactly what gets stored and how it sorts."
+      "text": "WHY THE DATE CONTROL IS THE BIGGEST FIX\n\nThe current form demands yyyy-MM-dd, parses it strictly, and clamps the year to 1900 or later. So \"about 1955\", \"before 1962\", and a bare year cannot be entered at all — and no ancestor born before 1900 can be added.\n\nThat is how family trees fill up with invented 1 January dates.\n\nClick through the seven modes: each changes the inputs, and shows exactly what gets stored and how it sorts.",
+      "page": "page-2"
     },
     {
       "id": "faces",
       "x": -350,
-      "y": 2760,
+      "y": 1740,
       "w": 300,
-      "text": "FACE TAGGING WITHOUT BIOMETRICS\n\nThe delightful part of the original idea is kept: open a group photo and see how everyone in it relates to you.\n\nWhat is dropped is automatic face matching. No template, embedding or measurement is computed or stored — a person draws a box and picks a name. That removes the GDPR Article 9 and Illinois BIPA exposure entirely, and the labels are correct rather than guessed.\n\nSwitch between Names, Kin to you, and Telugu."
+      "text": "FACE TAGGING WITHOUT BIOMETRICS\n\nThe delightful part of the original idea is kept: open a group photo and see how everyone in it relates to you.\n\nWhat is dropped is automatic face matching. No template, embedding or measurement is computed or stored — a person draws a box and picks a name. That removes the GDPR Article 9 and Illinois BIPA exposure entirely, and the labels are correct rather than guessed.\n\nSwitch between Names, Kin to you, and Telugu.",
+      "page": "page-2"
     },
     {
       "id": "review",
       "x": 2670,
-      "y": 2760,
+      "y": 1740,
       "w": 290,
-      "text": "MARKERS, IN THREE WEIGHTS\n\nBeing related to someone more than one way is ordinary in this family, so it is drawn as content: a quiet ⁂ count on the card, and every relationship listed in the right rail. Harinath is your father's elder brother AND, through his adoption, your granduncle — Peddananna and Thaatha. Both are true.\n\nAmber is reserved for a genuine contradiction. There is one: Hema is recorded female while carrying son-of and husband-of links, and those cannot all hold.\n\nA hollow dot means the record is merely incomplete — three people, including the two still called \"Parent1\" and \"Parent2\"."
+      "text": "MARKERS, IN THREE WEIGHTS\n\nBeing related to someone more than one way is ordinary in this family, so it is drawn as content: a quiet ⁂ count on the card, and every relationship listed in the right rail. Harinath is your father's elder brother AND, through his adoption, your granduncle — Peddananna and Thaatha. Both are true.\n\nAmber is reserved for a genuine contradiction. There is one: Hema is recorded female while carrying son-of and husband-of links, and those cannot all hold.\n\nA hollow dot means the record is merely incomplete — three people, including the two still called \"Parent1\" and \"Parent2\".",
+      "page": "page-2"
     },
     {
       "id": "vocab",
       "x": 1650,
-      "y": 3830,
+      "y": 2810,
       "w": 940,
-      "text": "ONE RELATION, SEVERAL WORDS — AND THE LIST GROWS\n\nYour father's people say చిన్నాన్న; your mother's say కక్కయ్య. Neither is a correction of the other.\n\nThe equivalents are DATA, not a fixed list. Type a word into any row and it joins that relation's alternatives immediately — because you discover these one at a time, from an aunt who uses a word you have never heard.\n\nAnd a word can be PINNED to one person. In the tree's right rail, tap any equivalent to always use it for that individual — 'everyone calls this particular uncle బాబాయి' — without changing what anyone else is called. Optional: the vocabulary already gives a sensible default, so the pin is only for the exceptions.\n\nThree sources, in order: the pin on the person, then the side's vocabulary, then the default. None of it touches a single link in the data, because the relationship is a struct and these are only its words."
+      "text": "ONE RELATION, SEVERAL WORDS — AND THE LIST GROWS\n\nYour father's people say చిన్నాన్న; your mother's say కక్కయ్య. Neither is a correction of the other.\n\nThe equivalents are DATA, not a fixed list. Type a word into any row and it joins that relation's alternatives immediately — because you discover these one at a time, from an aunt who uses a word you have never heard.\n\nAnd a word can be PINNED to one person. In the tree's right rail, tap any equivalent to always use it for that individual — 'everyone calls this particular uncle బాబాయి' — without changing what anyone else is called. Optional: the vocabulary already gives a sensible default, so the pin is only for the exceptions.\n\nThree sources, in order: the pin on the person, then the side's vocabulary, then the default. None of it touches a single link in the data, because the relationship is a struct and these are only its words.",
+      "page": "page-2"
     }
   ],
   "launch": {
-    "view": "canvas"
+    "view": "canvas",
+    "page": "page-1"
   }
 }
