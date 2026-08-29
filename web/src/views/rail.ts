@@ -20,6 +20,63 @@ function dates(p: PersonNode): string {
   return `${born} – ${died}`;
 }
 
+/**
+ * The action stack.
+ *
+ * The previous version put three equal buttons in one row of a 332px rail, so each got about
+ * 93px: two labels wrapped out of a 32px button and none of the three read as the thing to do
+ * next. One filled primary, two genuine peers on an equal grid, and the action that rewrites
+ * every label in the tree given its own row with a subtitle -- borrowing the wide
+ * icon-and-subtitle shape the export buttons already use rather than inventing one.
+ */
+function actions(p: PersonNode): string {
+  const isRoot = p.id === state.root;
+  return `
+    <p class="lbl" style="margin-top:20px">Actions</p>
+    <div class="acts">
+      <button class="btn is-primary" data-addperson="${p.id}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        Add a relative
+      </button>
+
+      <div class="acts-pair">
+        <button class="btn is-quiet" data-editperson="${p.id}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Edit details
+        </button>
+        <button class="btn is-quiet is-olive" data-showline="${p.id}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3v6M12 15v6M5 9h14l-3 6H8L5 9z" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Show line
+        </button>
+      </div>
+
+      <button class="btn is-wide${isRoot ? ' is-off' : ''}"
+              ${isRoot ? 'disabled' : `data-reroot="${p.id}"`}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" stroke="currentColor" stroke-width="1.7"
+                stroke-linecap="round"/>
+        </svg>
+        <span>
+          <span class="w-nm">${isRoot
+            ? 'Kinship is already measured from here'
+            : 'Measure kinship from here'}</span>
+          <span class="w-sub">${isRoot
+            ? 'Select someone else to move the reference point.'
+            : 'Every label in the tree is rewritten relative to this person.'}</span>
+        </span>
+      </button>
+    </div>`;
+}
+
 function relationshipBox(p: PersonNode, link: Relationship, index: number): string {
   const alternatives = link.alternatives.length > 0
     ? `<div class="alsorow">
@@ -122,10 +179,6 @@ export function renderRail(): string {
       ${addForm}
       ${multi}
 
-      <div class="acts">
-        <button class="btn ghost" data-reroot="${p.id}">Measure from here</button>
-        <button class="btn ghost" data-editperson="${p.id}">Edit</button>
-        <button class="btn ghost" data-addperson="${p.id}">Add a relative</button>
-      </div>
+      ${actions(p)}
     </div>`;
 }

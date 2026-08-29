@@ -102,6 +102,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ── three-column body ───────────────────────────────────────────────── */
 .body { display: grid; grid-template-columns: 236px 1fr 332px; min-height: 0; }
+/* A grid item's min-width defaults to auto, so a tree wider than the column stretched the
+   column instead of scrolling inside it — the canvas grew and the rails were pushed off.
+   Pinning both axes to 0 is what makes the middle column a viewport the tree pans within. */
+.body > main { display: flex; min-width: 0; min-height: 0; overflow: hidden; }
+.body > main > .canvas { flex: 1; min-width: 0; }
 .rail { background: var(--surface); overflow: auto; }
 .rail-l { border-right: 1px solid var(--rule); }
 .rail-r { border-left: 1px solid var(--rule); }
@@ -244,8 +249,35 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .multinote { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--olive-line); border-radius: 0 3px 3px 0; background: var(--olive-soft); font-size: 12.5px; color: #2b4a0e; line-height: 1.55; }
 .warn { margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--amber); background: var(--amber-soft); font-size: 12.5px; color: #5e360a; line-height: 1.55; }
 
-.acts { display: flex; gap: 8px; margin-top: 18px; }
-.acts .btn { flex: 1; }
+/* ── the action stack ────────────────────────────────────────────────────────
+   Three equal buttons in a 332px rail gave each about 93px, so two labels wrapped
+   out of a 32px button and none of them read as primary. One primary, two peers,
+   one wide row for the action that rewrites every label in the tree. */
+.acts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.acts .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.acts .btn.is-primary { width: 100%; height: 36px; font-size: 13px; }
+.acts-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.acts-pair .btn { height: 34px; padding: 0 8px; }
+.btn.is-quiet { border-color: var(--rule); background: var(--surface); color: var(--blue); }
+.btn.is-quiet:hover { border-color: var(--blue); background: var(--blue-soft); }
+.btn.is-quiet.is-olive { color: var(--olive); }
+.btn.is-quiet.is-olive:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.btn.is-wide {
+  height: auto; padding: 9px 11px; align-items: flex-start; justify-content: flex-start;
+  gap: 9px; text-align: left; border-color: var(--rule); background: var(--surface);
+  color: var(--olive);
+}
+.btn.is-wide:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.btn.is-wide svg { flex: none; margin-top: 1px; }
+.btn.is-wide .w-nm { display: block; font-size: 12.5px; font-weight: 600; }
+.btn.is-wide .w-sub {
+  display: block; margin-top: 2px; font-size: 11px; font-weight: 400;
+  color: var(--muted); line-height: 1.45;
+}
+.btn.is-wide.is-off {
+  border-style: dashed; background: var(--surface-2); color: var(--muted); cursor: default;
+}
+.btn.is-wide.is-off:hover { border-color: var(--rule); background: var(--surface-2); }
 
 /* ── states ──────────────────────────────────────────────────────────── */
 .state { display: grid; place-items: center; height: 100%; padding: 40px; text-align: center; }
@@ -368,4 +400,100 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (max-width: 720px) {
   .sheet { padding: 0; }
   .sheet-in { max-width: none; min-height: 100%; border: 0; border-radius: 0; }
+}
+
+/* ── panning ─────────────────────────────────────────────────────────────────
+   The canvas moves its own scroll rather than a transform, so the wheel, the
+   scrollbars and keyboard scrolling all still work. */
+.canvas { cursor: grab; }
+.canvas.is-panning { cursor: grabbing; user-select: none; }
+.canvas.is-panning .card, .canvas.is-panning .spouse { pointer-events: none; }
+
+.panhint, .recentre {
+  position: absolute; bottom: 16px; z-index: 5;
+  height: 30px; padding: 0 11px;
+  background: rgb(250 251 247 / 94%); border: 1px solid var(--rule); border-radius: 15px;
+  font-size: 11.5px; color: var(--muted);
+}
+.panhint { left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none; }
+.recentre { right: 16px; font-weight: 600; color: var(--ink-2); }
+.recentre:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+
+/* ── lineage view ───────────────────────────────────────────────────────────
+   One generation is the subject. The person above it is context, the row below
+   is what is being read. */
+.canvas-in.is-lineage { display: flex; flex-direction: column; align-items: center; }
+.lin-focus { display: flex; justify-content: center; }
+.lin-drop { width: 0; height: 26px; border-left: 2px solid var(--olive-line); }
+.lin-row {
+  position: relative; display: flex; align-items: flex-start; justify-content: center;
+  gap: 26px; padding-top: 22px;
+}
+.lin-row.is-multi::before {
+  content: ''; position: absolute; top: 0; left: 16%; right: 16%;
+  border-top: 2px solid var(--olive-line);
+}
+.lin-kid { position: relative; display: flex; flex-direction: column; align-items: center; }
+.lin-kid::before {
+  content: ''; position: absolute; top: -22px; left: 50%; height: 22px;
+  border-left: 2px solid var(--olive-line);
+}
+.lin-leaf {
+  max-width: 40ch; margin-top: 22px; padding: 12px 14px;
+  border: 1px dashed var(--olive-line); border-radius: 4px; background: var(--surface);
+  text-align: center; font-size: 12.5px; color: var(--ink-2); line-height: 1.55;
+}
+
+.descend {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 11px; padding: 4px 11px;
+  border: 1px dashed var(--olive-line); border-radius: 13px; background: var(--surface);
+  font-size: 11px; font-weight: 600; color: var(--olive);
+}
+.descend:hover { background: var(--olive-soft); }
+.nokids { margin-top: 11px; font-size: 11px; color: var(--muted); }
+
+/* A spouse is a pill, not a card: the line runs through one of the two, and giving
+   both equal weight is what turns a descent chart into an undifferentiated mesh. */
+.spouse {
+  display: inline-flex; align-items: center; gap: 6px; align-self: center;
+  height: 40px; padding: 0 11px;
+  border: 1px solid var(--rule); border-radius: 20px; background: var(--surface-2);
+  text-align: left;
+}
+.spouse:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.spouse.is-sel { border-color: var(--blue); background: var(--blue-soft); }
+.spouse .sym { margin-top: 0; }
+.spouse .sp-nm { display: block; font-size: 11.5px; font-weight: 600; line-height: 1.25; }
+.spouse .sp-kin {
+  display: block; max-width: 13ch; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: var(--telugu); font-size: 11px; color: var(--muted);
+  line-height: 1.3;
+}
+
+/* the line, in the left rail */
+.spine { display: flex; flex-direction: column; gap: 5px; }
+.spine-step {
+  display: flex; align-items: center; gap: 7px; width: 100%; height: 30px; padding: 0 8px;
+  border: 1px solid var(--rule); border-radius: 3px; background: var(--surface);
+  font-size: 12px; font-weight: 600; color: var(--ink-2); text-align: left;
+}
+.spine-step:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.spine-step.is-here { border-color: var(--olive-line); background: var(--olive-soft); color: var(--olive); }
+.spine-step.is-you .sp-n { color: var(--blue); }
+.spine-step .sp-i {
+  flex: none; width: 14px; text-align: center; font-size: 10px; font-weight: 700;
+  color: var(--muted);
+}
+.spine-step .sp-n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spine-step .sp-k {
+  flex: none; max-width: 9ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--telugu); font-size: 11.5px; font-weight: 400; color: var(--muted);
+}
+
+/* In view-all, the reader's own descent stays outlined so they keep their place. */
+.card.is-ownline { border-color: var(--olive-line); }
+
+@media (max-width: 900px) {
+  .lin-row { gap: 14px; }
+  .panhint { display: none; }
 }

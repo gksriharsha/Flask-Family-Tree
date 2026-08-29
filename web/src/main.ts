@@ -1,7 +1,7 @@
 import './styles.css';
 import type { ExportFormat } from './api';
 import { ApiError, api, loadToken, setToken } from './api';
-import { person, state } from './state';
+import { focusId, lineageSpine, person, state } from './state';
 import type { DateDraft, PersonDraft } from './views/personform';
 import { blankDraft, draftFrom, reads, renderPersonForm, sorts } from './views/personform';
 import { renderRail } from './views/rail';
@@ -32,6 +32,9 @@ async function reload(): Promise<void> {
     if (state.selected === null || !person(state.selected)) {
       state.selected = graph.Root;
     }
+    if (state.focus !== null && !person(state.focus)) {
+      state.focus = null;   // they were removed; fall back to the top of the line
+    }
   } catch (error) {
     state.error = error instanceof ApiError ? error.message : String(error);
     if (error instanceof ApiError && error.status === 401) state.token = '';
@@ -42,6 +45,44 @@ async function reload(): Promise<void> {
 }
 
 /* ── shell ─────────────────────────────────────────────────────────────────── */
+/**
+ * The line of descent currently on the canvas, oldest first.
+ *
+ * Built from the person in focus rather than from the reader, so descending into an uncle's
+ * branch still shows where you are instead of stranding you off your own line. Each step is
+ * a button: this is how you walk back up.
+ */
+function spineSection(): string {
+  const id = focusId();
+  if (id === null) return '';
+  const steps = lineageSpine(id);
+  if (steps.length === 0) return '';
+
+  return `
+    <div class="rail-sec">
+      <p class="lbl">This line</p>
+      <div class="spine">
+        ${steps
+          .map((stepId, i) => {
+            const p = person(stepId);
+            if (!p) return '';
+            const kin = p.relationships[0];
+            const here = stepId === id;
+            const you = stepId === state.root;
+            return `<button class="spine-step${here ? ' is-here' : ''}${you ? ' is-you' : ''}"
+                            data-focus="${stepId}">
+                      <span class="sp-i">${i + 1}</span>
+                      <span class="sp-n">${escape(p.given || p.name)}</span>
+                      <span class="sp-k">${escape(kin?.te ?? '')}</span>
+                    </button>`;
+          })
+          .join('')}
+      </div>
+      <div class="hint">Showing the children of
+        <strong>${escape(person(id)?.given ?? '')}</strong>. Tap a step to move the subject.</div>
+    </div>`;
+}
+
 function leftRail(): string {
   const rootPerson = state.root === null ? undefined : person(state.root);
   const counts = state.graph?.Counts;
@@ -58,6 +99,8 @@ function leftRail(): string {
       <div class="rail-sec">
         <button class="btn wide" data-addperson>Add a person</button>
       </div>
+
+      ${state.view === 'lineage' ? spineSection() : ''}
 
       <div class="rail-sec">
         <p class="lbl">Family vocabulary</p>
@@ -133,6 +176,10 @@ function topBar(): string {
         ${results}
       </div>
       <div class="seg">
+        <button data-view="lineage" aria-pressed="${state.view === 'lineage'}">Lineage</button>
+        <button data-view="all" aria-pressed="${state.view === 'all'}">View all</button>
+      </div>
+      <div class="seg">
         <button data-lang="en" aria-pressed="${state.lang === 'en'}">English</button>
         <button class="te" data-lang="te" aria-pressed="${state.lang === 'te'}">తెలుగు</button>
         <button data-lang="both" aria-pressed="${state.lang === 'both'}">Both</button>
@@ -195,6 +242,13 @@ function render(): void {
     return;
   }
 
+  // The whole shell is rebuilt on every render, which resets the canvas scroll. Carry it
+  // across, or selecting anyone throws the reader back to the top-left of the tree.
+  const keptScroll = (() => {
+    const canvas = root.querySelector('.canvas');
+    return canvas ? { x: canvas.scrollLeft, y: canvas.scrollTop } : null;
+  })();
+
   root.innerHTML = `
     <div class="shell">
       ${topBar()}
@@ -205,6 +259,14 @@ function render(): void {
       </div>
     </div>
     ${state.editor ? renderPersonForm(state.editor) : ''}`;
+
+  if (keptScroll) {
+    const canvas = root.querySelector('.canvas');
+    if (canvas) {
+      canvas.scrollLeft = keptScroll.x;
+      canvas.scrollTop = keptScroll.y;
+    }
+  }
 
   // Typing is not allowed to trigger a re-render, so the caret is only ever restored here --
   // after a toggle rebuilt the sheet -- rather than on every keystroke.
@@ -505,7 +567,40 @@ root.addEventListener('click', (event) => {
   if (reroot) {
     state.root = Number(reroot.dataset.reroot);
     state.open.clear();
+    state.focus = null;   // a new reference point means a new line
     void reload();
+    return;
+  }
+
+  const view = closest(t, 'data-view');
+  if (view) {
+    state.view = view.dataset.view as typeof state.view;
+    render();
+    return;
+  }
+
+  const focusStep = closest(t, 'data-focus');
+  if (focusStep) {
+    state.focus = Number(focusStep.dataset.focus);
+    state.selected = state.focus;
+    render();
+    return;
+  }
+
+  const showLine = closest(t, 'data-showline');
+  if (showLine) {
+    // Put this person's own line on the canvas, whichever mode we were in.
+    state.view = 'lineage';
+    state.focus = Number(showLine.dataset.showline);
+    render();
+    return;
+  }
+
+  if (closest(t, 'data-recentre')) {
+    const canvas = root.querySelector('.canvas');
+    if (canvas) {
+      canvas.scrollTo({ left: (canvas.scrollWidth - canvas.clientWidth) / 2, top: 0 });
+    }
     return;
   }
 
@@ -627,6 +722,53 @@ document.addEventListener('keydown', (event) => {
     render();
   }
 });
+
+/* ── drag to move the tree ─────────────────────────────────────────────────── */
+/**
+ * Panning moves the canvas's own scroll rather than a CSS transform, so the wheel, the
+ * scrollbars and keyboard scrolling all still work and nothing can be dragged out of reach.
+ * A drag only counts past a few pixels, so a click on a card is still a click.
+ */
+const DRAG_SLOP = 4;
+let suppressClick = false;
+let pan: { canvas: HTMLElement; x: number; y: number; sl: number; st: number;
+           moved: boolean } | null = null;
+
+root.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+  const canvas = (event.target as HTMLElement | null)?.closest?.('[data-pan]');
+  if (!(canvas instanceof HTMLElement)) return;
+  pan = { canvas, x: event.clientX, y: event.clientY,
+          sl: canvas.scrollLeft, st: canvas.scrollTop, moved: false };
+});
+
+window.addEventListener('pointermove', (event) => {
+  if (!pan) return;
+  const dx = event.clientX - pan.x;
+  const dy = event.clientY - pan.y;
+  if (!pan.moved && Math.abs(dx) < DRAG_SLOP && Math.abs(dy) < DRAG_SLOP) return;
+  if (!pan.moved) {
+    pan.moved = true;
+    pan.canvas.classList.add('is-panning');
+  }
+  pan.canvas.scrollLeft = pan.sl - dx;
+  pan.canvas.scrollTop = pan.st - dy;
+});
+
+window.addEventListener('pointerup', () => {
+  if (!pan) return;
+  pan.canvas.classList.remove('is-panning');
+  // A drag that ended over a card must not also select that card.
+  if (pan.moved) suppressClick = true;
+  pan = null;
+});
+
+root.addEventListener('click', (event) => {
+  if (!suppressClick) return;
+  suppressClick = false;
+  event.stopPropagation();
+  event.preventDefault();
+}, true);
 
 /* ── boot ──────────────────────────────────────────────────────────────────── */
 state.token = loadToken();
