@@ -877,8 +877,20 @@ function applyPan(): void {
   // bake a nonsense offset in permanently -- which is exactly what happened: a pass during
   // loading, when the canvas was 0px tall, pinned the tree 150px off the top of the screen.
   if (canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
-  const limit = (offset: number, content: number, view: number) =>
-    Math.max(KEEP_VISIBLE - content, Math.min(view - KEEP_VISIBLE, offset));
+
+  // How much must stay on screen. Held to half the viewport and half the content as well as
+  // to a flat maximum, because the canvas is far shorter than it is wide: a flat 150px is a
+  // fifth of the width but can be most of the height, which squeezed the vertical range to
+  // almost nothing and made the tree feel as though it only moved sideways.
+  const limit = (offset: number, content: number, view: number) => {
+    const keep = Math.min(KEEP_VISIBLE, view / 2, content / 2);
+    const lo = keep - content;
+    const hi = view - keep;
+    // A viewport smaller than what we insist on keeping would invert the range and pin the
+    // tree; centring it is the sane answer.
+    if (lo > hi) return (view - content) / 2;
+    return Math.max(lo, Math.min(hi, offset));
+  };
   panOffset.x = limit(panOffset.x, inner.offsetWidth, canvas.clientWidth);
   panOffset.y = limit(panOffset.y, inner.offsetHeight, canvas.clientHeight);
   inner.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px)`;
@@ -911,8 +923,14 @@ window.addEventListener('pointermove', (event) => {
 window.addEventListener('pointerup', () => {
   if (!drag) return;
   root.querySelector('.canvas')?.classList.remove('is-panning');
-  // A drag that ended over a card must not also select that card.
-  if (drag.moved) suppressClick = true;
+  // A drag that ended over a card must not also select that card. The browser fires that
+  // click synchronously after pointerup, so the flag is dropped on the next tick: otherwise a
+  // drag that happens to end over nothing leaves it set, and the reader's next real click --
+  // on a card, on Recentre -- is silently eaten.
+  if (drag.moved) {
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+  }
   drag = null;
 });
 
