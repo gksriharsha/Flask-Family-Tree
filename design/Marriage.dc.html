@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Faustina:wght@400;500;600;700&amp;family=Source+Sans+3:wght@400;500;600;700&amp;family=Noto+Serif+Telugu:wght@400;500;600&amp;display=swap">
+  <style>
+    :root {
+      --paper:#eff1ea; --surface:#fafbf7; --surface-2:#e7ebde; --sunk:#e2e7d6;
+      --ink:#1a1e15; --ink-2:#3d4636; --muted:#6b7563; --rule:#d3d9c6; --rule-soft:#e3e7d8;
+      --olive:#3f6d14; --olive-soft:#e4edd4; --olive-line:#7fa352;
+      --brown:#8f3f0a; --brown-soft:#f4e3d5;
+      --serif:'Faustina','Iowan Old Style',Georgia,serif;
+      --sans:'Source Sans 3','Helvetica Neue',Arial,'Noto Serif Telugu',sans-serif;
+      --telugu:'Noto Serif Telugu','Faustina',serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink);
+           font-family:var(--sans); font-size:14px; line-height:1.5;
+           -webkit-font-smoothing:antialiased; }
+    a { color:#1261bb; text-decoration:none; }
+    a:hover { color:#0e4e96; text-decoration:underline; }
+    .lbl { margin:0 0 8px; font-size:10px; font-weight:700; letter-spacing:.12em;
+           text-transform:uppercase; color:var(--muted); }
+    .opt { display:flex; flex-direction:column; gap:9px; padding:14px 0;
+           border-top:1px solid var(--rule-soft); }
+    .opt:first-of-type { border-top:0; }
+    .row { display:flex; align-items:center; }
+    .mini { width:140px; padding:8px 9px; background:var(--surface); border:1px solid var(--rule);
+            border-radius:4px; }
+    .mini .n { display:block; font-family:var(--serif); font-size:13.5px; font-weight:600;
+               line-height:1.2; }
+    .mini .y { display:block; margin-top:2px; font-size:11px; color:var(--muted); }
+    .pill { display:inline-flex; align-items:center; gap:6px; height:40px; padding:0 11px;
+            border:1px solid var(--rule); border-radius:20px; background:var(--surface-2); }
+    .pill .pn { display:block; font-size:11.5px; font-weight:600; line-height:1.25; }
+    .pill .pk { display:block; font-family:var(--telugu); font-size:11px; color:var(--muted);
+                line-height:1.3; }
+    .sym { display:inline-block; width:8px; height:8px; border:1.5px solid var(--muted); }
+    .sym.f { border-radius:50%; }
+    .why { margin:0; font-size:12px; color:var(--ink-2); line-height:1.55; max-width:56ch; }
+  </style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:2px; width:520px; padding:26px 24px 30px">
+
+  <div style="margin-bottom:14px">
+    <h2 style="margin:0 0 4px; font-family:var(--serif); font-size:21px; font-weight:600">Marriage</h2>
+    <p style="margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.55; max-width:52ch">
+      A union is not a descent, so it should not be a line of the same kind. Four ways, at the
+      size they are actually drawn.
+    </p>
+  </div>
+
+  <div class="opt">
+    <p class="lbl" style="color:var(--brown)">Now — a single grey line</p>
+    <div class="row">
+      <div class="mini"><span class="n"><span class="sym" style="margin-right:6px"></span>Eshwar Datta</span><span class="y">1928 – 2004</span></div>
+      <svg width="26" height="16" aria-hidden="true"><path d="M0 8h26" stroke="#D3D9C6" stroke-width="2"/></svg>
+      <span class="pill"><span class="sym f"></span><span><span class="pn">Girija</span><span class="pk">నానమ్మ</span></span></span>
+    </div>
+    <p class="why">The same stroke as descent, only paler. Nothing says these two people are
+       married rather than one being the parent of the other.</p>
+  </div>
+
+  <div class="opt">
+    <p class="lbl" style="color:var(--olive)">Double rule — recommended</p>
+    <div class="row">
+      <div class="mini"><span class="n"><span class="sym" style="margin-right:6px"></span>Eshwar Datta</span><span class="y">1928 – 2004</span></div>
+      <svg width="26" height="16" aria-hidden="true">
+        <path d="M0 5.5h26M0 10.5h26" stroke="#B08A63" stroke-width="1.1" stroke-linecap="round"/>
+      </svg>
+      <span class="pill"><span class="sym f"></span><span><span class="pn">Girija</span><span class="pk">నానమ్మ</span></span></span>
+    </div>
+    <p class="why">Two hairlines. This is the mark genealogy has used for marriage for a very
+       long time, so it needs no legend, and a warm neutral separates it from the olive of
+       descent by colour as well as by form.</p>
+  </div>
+
+  <div class="opt">
+    <p class="lbl">Double rule with a ring</p>
+    <div class="row">
+      <div class="mini"><span class="n"><span class="sym" style="margin-right:6px"></span>Eshwar Datta</span><span class="y">1928 – 2004</span></div>
+      <svg width="26" height="16" aria-hidden="true">
+        <path d="M0 8h8M18 8h8" stroke="#B08A63" stroke-width="1.1" stroke-linecap="round"/>
+        <circle cx="13" cy="8" r="3.6" fill="none" stroke="#B08A63" stroke-width="1.1"/>
+      </svg>
+      <span class="pill"><span class="sym f"></span><span><span class="pn">Girija</span><span class="pk">నానమ్మ</span></span></span>
+    </div>
+    <p class="why">More character, and an obvious place to hang a state on later &mdash; a
+       filled ring for a marriage that ended, a dashed one for a union that is recorded but
+       undated. Slightly fussy at this size if it never earns that.</p>
+  </div>
+
+  <div class="opt">
+    <p class="lbl">Tinted band</p>
+    <div class="row">
+      <div class="mini"><span class="n"><span class="sym" style="margin-right:6px"></span>Eshwar Datta</span><span class="y">1928 – 2004</span></div>
+      <svg width="26" height="16" aria-hidden="true">
+        <rect x="0" y="4" width="26" height="8" rx="4" fill="#F0E3D6"/>
+        <path d="M0 8h26" stroke="#B08A63" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+      <span class="pill"><span class="sym f"></span><span><span class="pn">Girija</span><span class="pk">నానమ్మ</span></span></span>
+    </div>
+    <p class="why">Unmissable, and it survives being shrunk further than the others. But it is
+       the heaviest thing on the canvas, which is the opposite of what was asked for.</p>
+  </div>
+
+  <div style="margin-top:12px; padding:11px 13px; background:var(--sunk); border-radius:4px;
+              font-size:12px; color:var(--ink-2); line-height:1.6">
+    All four keep the spouse as a pill rather than a card. The union mark is only being asked
+    to say <em>how</em> these two are joined; the pill is already saying that one of them
+    married in.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

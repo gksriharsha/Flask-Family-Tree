@@ -1,6 +1,8 @@
 import type { GraphResponse, PersonNode, Side, TreeInfo } from './api';
+import type { PersonDraft } from './views/personform';
 
 export type Lang = 'en' | 'te' | 'both';
+export type View = 'lineage' | 'all';
 
 export interface AppState {
   token: string;
@@ -15,9 +17,17 @@ export interface AppState {
   selected: number | null;
   side: Side;
   lang: Lang;
-  /** Branches the reader has opened. The root's own line is always open. */
+  /** Lineage is the default: one line of descent, explored a generation at a time. */
+  view: View;
+  /** Whose children the lineage view is showing. Null until the graph loads. */
+  focus: number | null;
+  /** Branches the reader has opened. Only used by the view-all mode. */
   open: Set<number>;
   addingWord: boolean;
+  /** Whether an import replaces the tree or adds to it. Never defaults to replace. */
+  importReplace: boolean;
+  /** The add/edit sheet, or null when it is closed. */
+  editor: PersonDraft | null;
   search: string;
   searchResults: { ID: number; Firstname: string; Lastname?: string }[];
 }
@@ -34,8 +44,12 @@ export const state: AppState = {
   selected: null,
   side: 'paternal',
   lang: 'both',
+  view: 'lineage',
+  focus: null,
   open: new Set(),
   addingWord: false,
+  importReplace: false,
+  editor: null,
   search: '',
   searchResults: [],
 };
@@ -120,4 +134,68 @@ export function label(p: PersonNode): string {
 export function years(p: PersonNode): string {
   if (p.birthYear === null) return 'birth year not recorded';
   return p.deathYear === null ? `b. ${p.birthYear}` : `${p.birthYear}–${p.deathYear}`;
+}
+
+
+/* ── lineage ───────────────────────────────────────────────────────────────── */
+/** Guard against a malformed graph sending an ancestor walk to the moon. */
+const MAX_DEPTH = 40;
+
+/**
+ * The parent a line of descent is followed through.
+ *
+ * A tree can only draw one spine, so one parent has to be picked. Sex is the tiebreak
+ * because that is how the families this is built for describe a line -- and it is only a
+ * tiebreak: with one parent recorded, that parent is the line, whoever they are.
+ */
+export function anchorParent(id: number): number | undefined {
+  const parents = parentsOf(id, false);
+  if (parents.length === 0) return undefined;
+  return parents.find((p) => person(p)?.sex === 'male') ?? parents[0];
+}
+
+/** Every ancestor up this person's line, oldest first, excluding them. */
+export function ancestorsOf(id: number): number[] {
+  const out: number[] = [];
+  const seen = new Set<number>([id]);
+  let current = anchorParent(id);
+  while (current !== undefined && !seen.has(current) && out.length < MAX_DEPTH) {
+    out.unshift(current);
+    seen.add(current);
+    current = anchorParent(current);
+  }
+  return out;
+}
+
+/**
+ * The chain the left rail walks: the topmost ancestor down to the person in focus.
+ *
+ * Built from the focus rather than from the root, so descending into an uncle's branch
+ * still shows where you are instead of stranding you off the reader's own line.
+ */
+export function lineageSpine(focusId: number): number[] {
+  return [...ancestorsOf(focusId), focusId];
+}
+
+/**
+ * Where the lineage view opens: the oldest recorded ancestor on the reader's own line.
+ *
+ * The brief is "if a grandfather is present, show their children" -- so the subject is the
+ * furthest ancestor, and the generation on display is the one below them.
+ */
+export function defaultFocus(): number | null {
+  if (state.root === null) return null;
+  const line = ancestorsOf(state.root);
+  return line[0] ?? state.root;
+}
+
+export function focusId(): number | null {
+  return state.focus ?? defaultFocus();
+}
+
+/** Is this person on the reader's own descent line? Used to keep them findable. */
+export function onOwnLine(id: number): boolean {
+  if (state.root === null) return false;
+  if (id === state.root) return true;
+  return ancestorsOf(state.root).includes(id);
 }

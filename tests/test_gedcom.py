@@ -161,3 +161,53 @@ def test_gedzip_carries_the_media_beside_the_file(graph, tmp_path):
 def test_an_unknown_version_is_refused(graph):
     with pytest.raises(ValueError, match='Unsupported GEDCOM version'):
         render(to_document(graph), '6.0')
+
+
+# ── importing a file ────────────────────────────────────────────────────────────
+def test_gedzip_and_plain_text_both_read():
+    """A .gdz is a zip with gedcom.ged at its root; a .ged is the text itself."""
+    import io
+    import zipfile
+
+    from Tree.gedcom.store import read_gedcom_text
+
+    text = '0 HEAD\n1 GEDC\n2 VERS 7.0\n0 @I1@ INDI\n1 NAME Ada /Varma/\n0 TRLR\n'
+    assert read_gedcom_text(text.encode('utf-8'), 'family.ged') == text
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w') as archive:
+        archive.writestr('gedcom.ged', text)
+    assert read_gedcom_text(buffer.getvalue(), 'family.gdz') == text
+
+
+def test_a_byte_order_mark_does_not_break_the_header():
+    """5.5.1 files written on Windows very often carry one, and a stray BOM on line one makes
+    the whole header unparseable."""
+    from Tree.gedcom.store import read_gedcom_text
+
+    text = '0 HEAD\n1 CHAR UTF-8\n0 TRLR\n'
+    assert read_gedcom_text(b'\xef\xbb\xbf' + text.encode('utf-8'), 'f.ged').startswith('0 HEAD')
+
+
+def test_an_archive_without_a_ged_is_refused():
+    import io
+    import zipfile
+
+    import pytest
+
+    from Tree.gedcom.store import read_gedcom_text
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w') as archive:
+        archive.writestr('readme.txt', 'not a tree')
+    with pytest.raises(ValueError, match=r'no \.ged'):
+        read_gedcom_text(buffer.getvalue(), 'family.gdz')
+
+
+def test_binary_rubbish_is_refused_rather_than_mangled():
+    import pytest
+
+    from Tree.gedcom.store import read_gedcom_text
+
+    with pytest.raises(ValueError, match='not UTF-8'):
+        read_gedcom_text(b'\xff\xfe\x00\x01\x02', 'family.ged')

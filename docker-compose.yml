@@ -5,6 +5,12 @@
 # index that the substring name search needs, so nothing in this application loses capability.
 # Move to the cql-es profile only when a single node genuinely stops being enough.
 
+# Pinned explicitly. Compose otherwise derives the project name from the directory name, which
+# means moving or renaming this checkout would silently point at a different set of volumes and
+# present an empty graph as if nothing had ever been seeded. The volumes below are named against
+# this value, not against wherever the working copy happens to live.
+name: familytree
+
 services:
   janusgraph:
     image: janusgraph/janusgraph:1.0.0
@@ -16,6 +22,8 @@ services:
       # from the host's memory and gets OOM-killed on a laptop-sized Docker VM.
       JAVA_OPTIONS: "-Xms512m -Xmx1g"
     mem_limit: 2g
+    # Comes back when the Docker daemon starts; stays down if stopped by hand.
+    restart: unless-stopped
     volumes:
       - janusgraph-data:/var/lib/janusgraph
       # Mounted so the server can load the helpers itself. To make the definitions survive a
@@ -53,12 +61,14 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       INJECT_GROOVY_AT_STARTUP: ${INJECT_GROOVY_AT_STARTUP:-1}
+    restart: unless-stopped
     volumes:
       - api-data:/data
     # Published on loopback only. Put a TLS-terminating reverse proxy in front before this is
-    # reachable from anywhere else.
+    # reachable from anywhere else. The host port is configurable because macOS runs its
+    # AirPlay Receiver on 5000, which would otherwise take the bind.
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:${API_PORT:-5000}:5000"
 
 volumes:
   janusgraph-data:

@@ -23,6 +23,7 @@ from Tree.kinship import (
     render_telugu,
     unresolved_seniority,
 )
+from Tree.kinship.model import UNKNOWN, Kinship
 from Tree.kinship.vocabulary import MATERNAL
 
 
@@ -267,3 +268,40 @@ def test_explain_never_returns_a_bare_full_stop(g):
     for a in (1, 5, 7, 24):
         for b in sorted(g.people):
             assert explain(closest(g, a, b)).strip() != '.'
+
+
+# ── a sex nobody recorded ───────────────────────────────────────────────────────
+def test_english_names_an_unrecorded_sex_without_inventing_one():
+    """`'Son' if male else 'Daughter'` called every person of unknown sex a daughter. The
+    add-person form offers "unknown" as a real answer, so the renderers have to mean it."""
+    for sex in (UNKNOWN, 'intersex'):
+        assert render_english(Kinship(kind='descendant', depth=1, sex=sex)) == 'Child'
+        assert render_english(Kinship(kind='ancestor', depth=1, sex=sex)) == 'Parent'
+        assert render_english(Kinship(kind='sibling', sex=sex)) == 'Sibling'
+        assert render_english(Kinship(kind='niblings', sex=sex)) == 'Sibling’s child'
+        assert render_english(Kinship(kind='affinal', via_sex=sex)) == 'Spouse'
+
+
+def test_english_still_names_a_recorded_sex_exactly():
+    assert render_english(Kinship(kind='descendant', depth=1, sex=MALE)) == 'Son'
+    assert render_english(Kinship(kind='descendant', depth=1, sex=FEMALE)) == 'Daughter'
+    assert render_english(Kinship(kind='niblings', sex=FEMALE)) == 'Niece'
+
+
+def test_telugu_shows_both_words_when_the_sex_is_not_recorded():
+    """Telugu has no neutral term for most of these, so it does what it already does for an
+    unknown birth order: shows both and marks the label as needing a fact."""
+    term = render_telugu(Kinship(kind='descendant', depth=1, sex=UNKNOWN))
+    assert term.text == 'కొడుకు / కూతురు'
+    assert term.unresolved is True
+    assert term.bases == ('కొడుకు', 'కూతురు')
+
+    # Sex and seniority both missing: every word it could be, and still marked unresolved.
+    sibling = render_telugu(Kinship(kind='sibling', sex=UNKNOWN))
+    assert sibling.unresolved is True
+    assert len(sibling.bases) == 4
+
+
+def test_telugu_does_not_duplicate_a_term_that_does_not_vary_by_sex():
+    term = render_telugu(Kinship(kind='cousin', degree=1, sex=UNKNOWN))
+    assert ' / ' not in term.text or term.bases[0] != term.bases[1]

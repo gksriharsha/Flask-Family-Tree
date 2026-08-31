@@ -9,6 +9,26 @@
 
 export type Sex = 'male' | 'female' | 'intersex' | 'unknown';
 export type Side = 'paternal' | 'maternal';
+export type LinkRole = 'biological' | 'adoptive';
+
+/**
+ * The seven ways a date actually gets recorded. Every one of them is an interval underneath:
+ * `about 1955` reaches a couple of years either side, `before 1962` is open at the far end,
+ * and `unknown` is no interval at all. Two dates can only be ordered when their intervals do
+ * not overlap, which is why the tree so often has to ask who was elder rather than work it out.
+ */
+export type DateMode = 'exact' | 'year' | 'about' | 'before' | 'after' | 'between' | 'unknown';
+
+export interface DateValue {
+  mode: DateMode;
+  year: number | null;
+  month: number | null;
+  day: number | null;
+  year2: number | null;
+  /** How the record reads, composed on the server so both languages agree. */
+  reads: string;
+  gedcom: string;
+}
 
 export interface Alternative {
   term: string;
@@ -49,8 +69,22 @@ export interface PersonNode {
   sex: Sex;
   birthYear: number | null;
   deathYear: number | null;
+  birth: DateValue;
+  death: DateValue;
+  living: boolean | null;
   relationships: Relationship[];
   seniorityQuestion: SeniorityQuestion | null;
+}
+
+/** What the add/edit form sends. Anything absent is left as it was. */
+export interface PersonInput {
+  given?: string;
+  surname?: string;
+  sex?: Sex;
+  living?: boolean | null;
+  birth?: Partial<DateValue> & { mode: DateMode };
+  death?: Partial<DateValue> & { mode: DateMode };
+  attachTo?: { personId: number; relation: 'parent' | 'child' | 'spouse'; role?: LinkRole };
 }
 
 export interface ParentLink {
@@ -96,7 +130,10 @@ export function loadToken(): string {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (token) headers.set('X-API-Token', token);
-  if (init.body) headers.set('Content-Type', 'application/json');
+  // FormData sets its own Content-Type, boundary and all; overriding it breaks the upload.
+  if (init.body && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   const response = await fetch(path, { ...init, headers });
   const payload = await response.json().catch(() => ({}));
@@ -115,6 +152,16 @@ export interface TreeInfo {
 
 export type ExportFormat = 'gedcom7' | 'gedcom551' | 'gedzip';
 
+export interface ImportSummary {
+  people: number;
+  parentLinks: number;
+  unions: number;
+  birthOrder: number;
+  /** How many people the import removed first, when it replaced rather than added. */
+  replaced: number;
+  source?: string;
+}
+
 export const api = {
   /** Where this tree keeps its files, or null if none has been created yet. */
   tree: () => request<{ Tree: TreeInfo | null }>('/api/v1/trees'),
@@ -132,11 +179,15 @@ export const api = {
       body: JSON.stringify({ format }),
     }),
 
-  importTree: (path: string) =>
-    request<{ Result: { people: number; parentLinks: number; unions: number } }>(
-      '/api/v1/trees/import',
-      { method: 'POST', body: JSON.stringify({ path }) },
-    ),
+  /** Upload a .ged/.gedcom/.gdz. `replace` clears the existing people first. */
+  importTree: (file: File, replace: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mode', replace ? 'replace' : 'add');
+    // No Content-Type here on purpose: the browser has to set the multipart boundary itself.
+    return request<{ Result: ImportSummary }>('/api/v1/trees/import',
+                                              { method: 'POST', body: form });
+  },
 
   /** Cheap token check, so a bad token gives a clear answer rather than a failed load. */
   session: () => request<{ Message: string }>('/api/v1/session'),
@@ -175,5 +226,46 @@ export const api = {
     request<{ Message: string }>(`/api/v1/people/${personId}/pinned-term`, {
       method: 'DELETE',
       body: JSON.stringify({ base_term: baseTerm }),
+    }),
+
+  /** Add a person, optionally attaching them to somebody already in the tree. */
+  addPerson: (input: PersonInput) =>
+    request<{ Person: { id: number } }>('/api/v1/people', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  /** Change some of a person's details. Absent fields are left alone. */
+  editPerson: (id: number, input: PersonInput) =>
+    request<{ Person: { id: number } }>(`/api/v1/people/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+
+  removePerson: (id: number) =>
+    request<{ Message: string }>(`/api/v1/people/${id}`, { method: 'DELETE' }),
+
+  linkParent: (childId: number, parentId: number, role: LinkRole = 'biological') =>
+    request<{ Message: string }>('/api/v1/links', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'parent', childId, parentId, role }),
+    }),
+
+  unlinkParent: (childId: number, parentId: number) =>
+    request<{ Message: string }>('/api/v1/links', {
+      method: 'DELETE',
+      body: JSON.stringify({ type: 'parent', childId, parentId }),
+    }),
+
+  linkUnion: (aId: number, bId: number) =>
+    request<{ Message: string }>('/api/v1/links', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'union', aId, bId }),
+    }),
+
+  unlinkUnion: (aId: number, bId: number) =>
+    request<{ Message: string }>('/api/v1/links', {
+      method: 'DELETE',
+      body: JSON.stringify({ type: 'union', aId, bId }),
     }),
 };
