@@ -228,3 +228,98 @@ def test_a_date_reaches_the_store_at_the_precision_it_was_sent(client, stub_stor
     birth = stub_store[0]['birth']
     assert (birth.mode, birth.year, birth.year2) == ('between', 1950, 1960)
     assert birth.gedcom() == 'BET 1950 AND 1960'
+
+
+# ── importing a GEDCOM ──────────────────────────────────────────────────────────
+TINY_GED = (b'0 HEAD\n1 GEDC\n2 VERS 7.0\n'
+            b'0 @I1@ INDI\n1 NAME Ada /Varma/\n1 SEX F\n1 BIRT\n2 DATE ABT 1900\n'
+            b'0 TRLR\n')
+
+
+@pytest.fixture()
+def stub_import(monkeypatch):
+    """Stand in for the store and the schema pass, so nothing needs a database."""
+    calls = []
+
+    def fake_import(_g, text, replace=False):
+        calls.append({'text': text, 'replace': replace})
+        return {'people': 1, 'parentLinks': 0, 'unions': 0, 'birthOrder': 0,
+                'replaced': 7 if replace else 0}
+
+    monkeypatch.setattr(routes, 'import_document', fake_import)
+    monkeypatch.setattr(routes, '_ensure_schema', lambda: None)
+    monkeypatch.setattr(routes, '_refresh_files', lambda: None)
+    return calls
+
+
+def _upload(client, name='family.ged', data=TINY_GED, mode=None):
+    import io
+    payload = {'file': (io.BytesIO(data), name)}
+    if mode is not None:
+        payload['mode'] = mode
+    return client.post('/api/v1/trees/import', data=payload,
+                       content_type='multipart/form-data', headers=AUTH)
+
+
+def test_a_gedcom_can_be_uploaded(client, stub_import):
+    """The endpoint used to accept only a path on the server, which a browser cannot supply --
+    so the interface promised an Import that did not exist."""
+    response = _upload(client)
+    assert response.status_code == 200
+    assert response.get_json()['Result']['people'] == 1
+
+
+def test_import_adds_unless_replace_is_asked_for(client, stub_import):
+    """Silently deleting somebody's records because they wanted to look at a file is not a
+    recoverable mistake, so replacing is never the default."""
+    _upload(client)
+    assert stub_import[-1]['replace'] is False
+    _upload(client, mode='add')
+    assert stub_import[-1]['replace'] is False
+    _upload(client, mode='replace')
+    assert stub_import[-1]['replace'] is True
+
+
+def test_only_genealogy_file_types_are_accepted(client, stub_import):
+    for name in ('family.txt', 'photo.jpg', 'family'):
+        assert _upload(client, name=name).status_code == 400
+    for name in ('family.ged', 'family.gedcom'):
+        assert _upload(client, name=name).status_code == 200
+
+
+def test_a_gedzip_must_actually_be_an_archive(client, stub_import):
+    """Naming plain text .gdz does not make it one, and unzipping it fails: better to say so
+    than to hand the parser something that was never a GEDCOM."""
+    import io
+    import zipfile
+
+    assert _upload(client, name='family.gdz').status_code == 400
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w') as archive:
+        archive.writestr('gedcom.ged', TINY_GED.decode())
+    assert _upload(client, name='family.gdz', data=buffer.getvalue()).status_code == 200
+
+
+def test_an_empty_upload_is_refused(client, stub_import):
+    response = _upload(client, data=b'')
+    assert response.status_code == 400
+    assert 'empty' in response.get_json()['Message']
+
+
+def test_a_file_with_no_people_is_refused(client, monkeypatch):
+    """A file that parses to nothing is almost certainly not a GEDCOM, and importing it would
+    quietly do nothing at all."""
+    monkeypatch.setattr(routes, '_ensure_schema', lambda: None)
+    monkeypatch.setattr(routes, '_refresh_files', lambda: None)
+    response = _upload(client, data=b'0 HEAD\n1 GEDC\n2 VERS 7.0\n0 TRLR\n')
+    assert response.status_code == 400
+    assert 'No people' in response.get_json()['Message']
+
+
+def test_import_requires_the_token(client):
+    import io
+    response = client.post('/api/v1/trees/import',
+                           data={'file': (io.BytesIO(TINY_GED), 'family.ged')},
+                           content_type='multipart/form-data')
+    assert response.status_code == 401

@@ -259,31 +259,80 @@ def write_family_graph(g, family: FamilyGraph) -> dict[int, int]:
     return created
 
 
-def import_file(g, path: str | Path) -> dict:
-    """Read a GEDCOM (or GEDZIP) file into the graph. Adds to whatever is already there."""
-    source = Path(path).expanduser()
-    if not source.is_file():
-        raise ValueError(f'No file at {source}')
+GEDCOM_SUFFIXES = ('.ged', '.gedcom')
+ARCHIVE_SUFFIXES = ('.gdz', '.zip')
 
-    if source.suffix.lower() in ('.gdz', '.zip'):
+
+def read_gedcom_text(data: bytes, filename: str = '') -> str:
+    """Get the GEDCOM text out of an uploaded file, unwrapping a GEDZIP if that is what it is.
+
+    Decoded as utf-8-sig: 5.5.1 files written on Windows very often carry a byte-order mark,
+    and a stray BOM on the first line makes the whole header unparseable.
+    """
+    suffix = Path(filename).suffix.lower()
+    if suffix in ARCHIVE_SUFFIXES:
+        import io
         import zipfile
-        with zipfile.ZipFile(source) as archive:
-            names = [n for n in archive.namelist() if n.lower().endswith('.ged')]
-            if not names:
-                raise ValueError('The archive holds no .ged file.')
-            preferred = 'gedcom.ged' if 'gedcom.ged' in names else names[0]
-            text = archive.read(preferred).decode('utf-8-sig')
-    else:
-        text = source.read_text(encoding='utf-8-sig')
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                names = [n for n in archive.namelist() if n.lower().endswith('.ged')]
+                if not names:
+                    raise ValueError('That archive holds no .ged file.')
+                preferred = 'gedcom.ged' if 'gedcom.ged' in names else names[0]
+                return archive.read(preferred).decode('utf-8-sig')
+        except zipfile.BadZipFile as exc:
+            raise ValueError('That file is not a readable archive.') from exc
+    try:
+        return data.decode('utf-8-sig')
+    except UnicodeDecodeError as exc:
+        raise ValueError('That file is not UTF-8 text, so it cannot be read as GEDCOM.') from exc
 
+
+def clear_people(g) -> int:
+    """Remove every person, and with them every link between people.
+
+    Deliberately leaves the tree's settings and the family's vocabulary alone: the words a
+    family uses for its relationships are not part of any one imported file, and losing them
+    on an import nobody warned you about would be its own small disaster. Pins go, because a
+    pin is an edge from a person who no longer exists.
+    """
+    people = g.V().hasLabel('Person').count().next()
+    if people:
+        g.V().hasLabel('Person').drop().iterate()
+    return int(people)
+
+
+def import_document(g, text: str, replace: bool = False) -> dict:
+    """Write a parsed GEDCOM into the graph, in the shape the rest of the app expects.
+
+    Everything goes in through write_family_graph, which is the same path the seed and the
+    interactive writes use -- so an imported tree gets the declared property keys, the
+    gendered edge labels with their sex-neutral fallbacks, dates at their recorded precision,
+    and the ELDER_THAN edges. Nothing about an imported person is stored differently from one
+    typed in by hand.
+    """
     family, _ = parse(text)
+    if not family.people:
+        raise ValueError('No people were found in that file. Is it really a GEDCOM?')
+
+    removed = clear_people(g) if replace else 0
     created = write_family_graph(g, family)
-    log.info('Imported %d people from %s', len(created), source)
+    log.info('Imported %d people (replace=%s, removed %d)', len(created), replace, removed)
     return {
         'people': len(created),
         'parentLinks': sum(len(v) for v in family.parents.values()),
         'unions': len(family.unions),
         'birthOrder': len(family.birth_order),
-        'source': str(source),
+        'replaced': removed,
     }
 
+
+def import_file(g, path: str | Path, replace: bool = False) -> dict:
+    """Read a GEDCOM or GEDZIP file from disk. Used by the command line."""
+    source = Path(path).expanduser()
+    if not source.is_file():
+        raise ValueError(f'No file at {source}')
+    summary = import_document(g, read_gedcom_text(source.read_bytes(), source.name),
+                              replace=replace)
+    summary['source'] = str(source)
+    return summary

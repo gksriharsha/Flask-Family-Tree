@@ -130,7 +130,10 @@ export function loadToken(): string {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (token) headers.set('X-API-Token', token);
-  if (init.body) headers.set('Content-Type', 'application/json');
+  // FormData sets its own Content-Type, boundary and all; overriding it breaks the upload.
+  if (init.body && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   const response = await fetch(path, { ...init, headers });
   const payload = await response.json().catch(() => ({}));
@@ -149,6 +152,16 @@ export interface TreeInfo {
 
 export type ExportFormat = 'gedcom7' | 'gedcom551' | 'gedzip';
 
+export interface ImportSummary {
+  people: number;
+  parentLinks: number;
+  unions: number;
+  birthOrder: number;
+  /** How many people the import removed first, when it replaced rather than added. */
+  replaced: number;
+  source?: string;
+}
+
 export const api = {
   /** Where this tree keeps its files, or null if none has been created yet. */
   tree: () => request<{ Tree: TreeInfo | null }>('/api/v1/trees'),
@@ -166,11 +179,15 @@ export const api = {
       body: JSON.stringify({ format }),
     }),
 
-  importTree: (path: string) =>
-    request<{ Result: { people: number; parentLinks: number; unions: number } }>(
-      '/api/v1/trees/import',
-      { method: 'POST', body: JSON.stringify({ path }) },
-    ),
+  /** Upload a .ged/.gedcom/.gdz. `replace` clears the existing people first. */
+  importTree: (file: File, replace: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mode', replace ? 'replace' : 'add');
+    // No Content-Type here on purpose: the browser has to set the multipart boundary itself.
+    return request<{ Result: ImportSummary }>('/api/v1/trees/import',
+                                              { method: 'POST', body: form });
+  },
 
   /** Cheap token check, so a bad token gives a clear answer rather than a failed load. */
   session: () => request<{ Message: string }>('/api/v1/session'),

@@ -24,6 +24,8 @@ export interface AppState {
   /** Branches the reader has opened. Only used by the view-all mode. */
   open: Set<number>;
   addingWord: boolean;
+  /** Whether an import replaces the tree or adds to it. Never defaults to replace. */
+  importReplace: boolean;
   /** The add/edit sheet, or null when it is closed. */
   editor: PersonDraft | null;
   search: string;
@@ -46,6 +48,7 @@ export const state: AppState = {
   focus: null,
   open: new Set(),
   addingWord: false,
+  importReplace: false,
   editor: null,
   search: '',
   searchResults: [],

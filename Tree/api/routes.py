@@ -6,18 +6,23 @@ never buildable against it.
 """
 
 import logging
+from pathlib import Path
 
 from flask import Blueprint, current_app, request
 
 from Tree import g
 from Tree.gedcom.model import VERSION_7, VERSION_551
 from Tree.gedcom.store import (
+    ARCHIVE_SUFFIXES,
+    GEDCOM_SUFFIXES,
     TreeNotCreated,
     create_tree,
     export,
     export_as,
+    import_document,
     import_file,
     load_settings,
+    read_gedcom_text,
 )
 from Tree.kinship import (
     explain,
@@ -195,14 +200,67 @@ def post_export():
               Bytes=written.stat().st_size)
 
 
+def _ensure_schema() -> None:
+    """Declare the property keys, labels and indexes before writing an imported tree.
+
+    Without a declared schema JanusGraph invents one at write time and guesses cardinality,
+    which is what produced SINGLE/SET conflicts on any property legitimately holding several
+    values. Applying it here is idempotent -- it creates only what is missing -- so an import
+    into an empty database lands in exactly the shape the rest of the app expects rather than
+    in whatever the first write happened to imply.
+    """
+    from Tree import message_serializer
+    from Tree.schema import apply_schema
+    created, conflicts = apply_schema(
+        current_app.config['GREMLIN_DATABASE_URI'],
+        current_app.config['GREMLIN_TRAVERSAL_SOURCE'],
+        wire=message_serializer(current_app.config['GREMLIN_SERIALIZER']),
+    )
+    if created:
+        log.info('Import declared %d missing schema object(s).', len(created))
+    if conflicts:
+        # Writing anyway would half-import and fail partway, which is worse than not starting.
+        raise ApiError(
+            'The database has property keys that conflict with this schema, so an import '
+            'would fail partway through: ' + ', '.join(conflicts), status=409)
+
+
 @api.route('/trees/import', methods=['POST'])
 def post_import():
-    """Read a GEDCOM or GEDZIP file into the tree."""
-    body = json_body(required=('path',))
-    try:
-        summary = import_file(g, str(body['path']).strip())
-    except (ValueError, OSError) as exc:
-        raise ApiError(str(exc)) from exc
+    """Read a GEDCOM or GEDZIP into the tree, as an upload or from a path on the server.
+
+    ``mode=replace`` clears the existing people first. That is the usual intent -- an imported
+    file is normally *the* tree rather than an addition to one -- but it is never the default,
+    because silently deleting somebody's records because they wanted to look at a file is not
+    a recoverable mistake.
+    """
+    upload = request.files.get('file')
+    mode = (request.form.get('mode') if upload else None) or ''
+    replace = mode.strip().lower() == 'replace'
+
+    if upload is not None:
+        name = upload.filename or ''
+        suffix = Path(name).suffix.lower()
+        if suffix not in GEDCOM_SUFFIXES + ARCHIVE_SUFFIXES:
+            raise ApiError('Expected a .ged, .gedcom or .gdz file, got ' + (name or 'no name'))
+        data = upload.read()
+        if not data:
+            raise ApiError('That file is empty.')
+        _ensure_schema()
+        try:
+            summary = import_document(g, read_gedcom_text(data, name), replace=replace)
+        except ValueError as exc:
+            raise ApiError(str(exc)) from exc
+        summary['source'] = name
+    else:
+        body = json_body(required=('path',))
+        replace = str(body.get('mode') or '').strip().lower() == 'replace'
+        _ensure_schema()
+        try:
+            summary = import_file(g, str(body['path']).strip(), replace=replace)
+        except (ValueError, OSError) as exc:
+            raise ApiError(str(exc)) from exc
+
     _refresh_files()
     return ok('Imported', Result=summary)
 

@@ -542,3 +542,22 @@ select.f-i { height: 38px; }
   .lin-row { gap: 14px; }
   .panhint { display: none; }
 }
+
+/* ── import ─────────────────────────────────────────────────────────────────── */
+.importer input[type='file'] {
+  width: 100%; font-size: 11.5px; color: var(--ink-2);
+}
+.importer input[type='file']::file-selector-button {
+  margin-right: 8px; height: 26px; padding: 0 10px;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--surface); color: var(--blue);
+  font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.importer input[type='file']::file-selector-button:hover {
+  border-color: var(--blue); background: var(--blue-soft);
+}
+/* Replacing is destructive, so the control that does it says so in the warning colour
+   rather than in the same blue as everything harmless. */
+.importer .seg button[data-importmode='replace'][aria-pressed='true'] {
+  background: var(--brown); color: #fff;
+}

@@ -137,6 +137,20 @@ function leftRail(): string {
           <button class="btn ghost" data-export="gedcom551">GEDCOM 5.5.1 <small>older tools</small></button>
           <button class="btn ghost" data-export="gedcom7">GEDCOM 7 <small>copy</small></button>
         </div>
+
+        <div class="importer">
+          <p class="lbl" style="margin-top:16px">Import</p>
+          <input type="file" id="ged-file" accept=".ged,.gedcom,.gdz"
+                 aria-label="GEDCOM file to import" />
+          <div class="seg vseg" style="margin-top:8px">
+            <button data-importmode="add" aria-pressed="${!state.importReplace}">Add to tree</button>
+            <button data-importmode="replace" aria-pressed="${state.importReplace}">Replace tree</button>
+          </div>
+          <div class="hint">${state.importReplace
+            ? 'Every person now in the tree is removed first. Your recorded words and pins are kept.'
+            : 'Everyone in the file is added alongside the people already here.'}</div>
+          <button class="btn" style="width:100%; margin-top:9px" data-doimport>Import file</button>
+        </div>
         ${state.notice ? `<div class="notice">${escape(state.notice)}</div>` : ''}
       </div>
 
@@ -205,7 +219,7 @@ function firstRun(): string {
         <div><button class="btn" data-createtree>Create the tree</button></div>
         ${state.error ? `<p class="err">${escape(state.error)}</p>` : ''}
         <p style="margin-top:18px;font-size:13px;color:var(--muted)">
-          Already have a GEDCOM file? Create the tree first, then use Import.
+          Already have a GEDCOM file? Create the tree first, then import it from the left rail.
         </p>
       </div>
     </div>`;
@@ -523,6 +537,44 @@ root.addEventListener('click', (event) => {
     }
     void guard(async () => {
       state.tree = (await api.createTree(name, location)).Tree;
+      await reload();
+    });
+    return;
+  }
+
+  const importMode = closest(t, 'data-importmode');
+  if (importMode) {
+    state.importReplace = importMode.dataset.importmode === 'replace';
+    render();
+    return;
+  }
+
+  if (closest(t, 'data-doimport')) {
+    const picker = document.getElementById('ged-file') as HTMLInputElement | null;
+    const file = picker?.files?.[0];
+    if (!file) {
+      state.error = 'Choose a .ged, .gedcom or .gdz file first.';
+      render();
+      return;
+    }
+    const replace = state.importReplace;
+    void guard(async () => {
+      const summary = (await api.importTree(file, replace)).Result;
+      const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+      state.notice = `Imported ${plural(summary.people, 'person', 'people')}`
+        + `, ${plural(summary.parentLinks, 'parent link', 'parent links')}`
+        + ` and ${plural(summary.unions, 'union', 'unions')} from ${file.name}`
+        + (summary.replaced
+            ? ` — ${plural(summary.replaced, 'previous person', 'previous people')} removed`
+            : '');
+      state.error = null;
+      // The tree that was on screen may be gone entirely, so start from whatever the
+      // reimported graph says its root is rather than from a stale id.
+      state.root = null;
+      state.focus = null;
+      state.selected = null;
+      state.open.clear();
+      resetPan();
       await reload();
     });
     return;
