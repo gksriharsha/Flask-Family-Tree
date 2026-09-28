@@ -211,3 +211,53 @@ def test_binary_rubbish_is_refused_rather_than_mangled():
 
     with pytest.raises(ValueError, match='not UTF-8'):
         read_gedcom_text(b'\xff\xfe\x00\x01\x02', 'family.ged')
+
+
+# ── places (BIRT/DEAT PLAC) ──────────────────────────────────────────────────────
+def test_places_are_written_as_plac_under_the_event(graph):
+    from Tree.gedcom import render, to_document
+
+    places = {1: {'birthPlace': 'Hyderabad, India', 'deathPlace': ''},
+              5: {'birthPlace': 'Guntur', 'deathPlace': 'Chennai'}}
+    text = render(to_document(graph, places=places), VERSION_7)
+    assert '2 PLAC Hyderabad, India' in text
+    assert '2 PLAC Guntur' in text
+    assert '2 PLAC Chennai' in text
+
+
+def test_places_round_trip_through_parse_with_places(graph):
+    from Tree.gedcom import render, to_document
+    from Tree.gedcom.mapping import parse_with_places
+
+    places = {1: {'birthPlace': 'Hyderabad', 'deathPlace': ''},
+              5: {'birthPlace': 'Guntur', 'deathPlace': 'Chennai'}}
+    text = render(to_document(graph, places=places), VERSION_7)
+    restored, _ids, restored_places = parse_with_places(text)
+
+    by_name = {p.full_name: p for p in restored.people.values()}
+    hyderabad = restored_places[by_name['Aditya Varun Varma'].id]
+    assert hyderabad['birthPlace'] == 'Hyderabad'
+    eshwar = restored_places[by_name['Eshwar Datta Varma'].id]
+    assert eshwar['birthPlace'] == 'Guntur'
+    assert eshwar['deathPlace'] == 'Chennai'
+
+
+def test_a_place_with_no_date_still_emits_its_event(graph):
+    """A person with a birth place but no birth date must still get a BIRT with the PLAC under
+    it, or the place would have nowhere to live in the file."""
+    from Tree.gedcom import render, to_document
+
+    # person 2 has no birth year in the fixture
+    text = render(to_document(graph, places={2: {'birthPlace': 'Vizag', 'deathPlace': ''}}),
+                  VERSION_7)
+    block = text.split('0 @I2@ INDI')[1].split('\n0 ')[0]
+    assert '1 BIRT' in block
+    assert '2 PLAC Vizag' in block
+
+
+def test_parse_reports_no_places_when_none_are_present(graph):
+    from Tree.gedcom import render, to_document
+    from Tree.gedcom.mapping import parse_with_places
+
+    _restored, _ids, places = parse_with_places(render(to_document(graph), VERSION_7))
+    assert places == {}

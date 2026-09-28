@@ -32,7 +32,17 @@ PEDIGREE_TO_ROLE = {
 }
 
 
-def to_document(graph: FamilyGraph, tree_name: str = 'Family Tree') -> Document:
+def to_document(graph: FamilyGraph, tree_name: str = 'Family Tree',
+                places: dict[int, dict] | None = None) -> Document:
+    """Build a GEDCOM Document from the graph.
+
+    ``places`` optionally maps a person id to ``{'birthPlace', 'deathPlace'}``. The place is
+    not a field on the engine's :class:`Person` (the kinship engine has no use for it), so it
+    is passed alongside the graph and written as a ``PLAC`` under the ``BIRT`` / ``DEAT``
+    event. Absent or empty places write nothing, so a tree with no places recorded produces
+    exactly the file it did before.
+    """
+    places = places or {}
     person_xref = {pid: f'@I{index + 1}@' for index, pid in enumerate(sorted(graph.people))}
     document = Document(tree_name=tree_name)
 
@@ -98,6 +108,8 @@ def to_document(graph: FamilyGraph, tree_name: str = 'Family Tree') -> Document:
             sex=person.sex,
             birth=person.birth_date,
             death=person.death_date,
+            birth_place=str((places.get(pid) or {}).get('birthPlace') or ''),
+            death_place=str((places.get(pid) or {}).get('deathPlace') or ''),
             child_of=child_links.get(pid, []),
             spouse_in=sorted(spouse_in.get(pid, [])),
             elder_than=younger,
@@ -133,6 +145,23 @@ def parse(text: str) -> tuple[FamilyGraph, dict[str, int]]:
     Accepts 5.5.1 and 7.0. Returns the graph and the xref-to-id map, so an importer can
     report what it created. Ids are assigned in file order; the graph database assigns its
     own on write.
+
+    Kept as a two-tuple for the callers and tests that only want the graph and ids;
+    :func:`parse_with_places` is the same parse and additionally returns the birth/death
+    places, which the store persists on import.
+    """
+    graph, ids, _places = parse_with_places(text)
+    return graph, ids
+
+
+def parse_with_places(
+    text: str,
+) -> tuple[FamilyGraph, dict[str, int], dict[int, dict]]:
+    """As :func:`parse`, and also return ``{file_id: {'birthPlace', 'deathPlace'}}``.
+
+    The place is not part of the engine's :class:`Person`, so it travels beside the graph.
+    Only people with a birth or death place recorded appear in the map, keyed by the same
+    file-order id the graph carries, so the importer can translate it to the database id.
     """
     graph = FamilyGraph()
     ids: dict[str, int] = {}
@@ -188,6 +217,11 @@ def parse(text: str) -> tuple[FamilyGraph, dict[str, int]]:
                     current['birth'] = DateValue.parse(value)
                 elif context[-2] == 'DEAT':
                     current['death'] = DateValue.parse(value)
+            elif level == 2 and tag == 'PLAC' and len(context) >= 2:
+                if context[-2] == 'BIRT':
+                    current['birth_place'] = value.strip()
+                elif context[-2] == 'DEAT':
+                    current['death_place'] = value.strip()
             elif level == 1 and tag == 'FAMC':
                 current['famc'].append([value.strip(), 'BIRTH'])
             elif level == 2 and tag == 'PEDI' and current['famc']:
@@ -238,4 +272,11 @@ def parse(text: str) -> tuple[FamilyGraph, dict[str, int]]:
             if xref in ids and younger in ids:
                 graph.record_birth_order(ids[xref], ids[younger])
 
-    return graph, ids
+    places: dict[int, dict] = {}
+    for xref, record in raw_individuals.items():
+        birth_place = str(record.get('birth_place') or '')
+        death_place = str(record.get('death_place') or '')
+        if birth_place or death_place:
+            places[ids[xref]] = {'birthPlace': birth_place, 'deathPlace': death_place}
+
+    return graph, ids, places

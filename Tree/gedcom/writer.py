@@ -66,12 +66,21 @@ def _individual(person, version: str) -> list[Line]:
         lines.append(Line(2, 'SURN', person.surname))
     lines.append(Line(1, 'SEX', sex_map.get(person.sex, 'U')))
 
-    # An event with no date is still worth writing when the fact itself is known, but this
-    # tree only records the date, so an unknown date means there is nothing to say.
-    if person.birth.is_known:
-        lines += [Line(1, 'BIRT'), Line(2, 'DATE', person.birth.gedcom())]
-    if person.death.is_known:
-        lines += [Line(1, 'DEAT'), Line(2, 'DATE', person.death.gedcom())]
+    # An event is worth writing when either its date or its place is known. A place with no
+    # date is common in old records ("born in the village, year unknown"), so the event is
+    # emitted whenever there is anything to say under it, with DATE and PLAC as subordinates.
+    if person.birth.is_known or person.birth_place:
+        lines.append(Line(1, 'BIRT'))
+        if person.birth.is_known:
+            lines.append(Line(2, 'DATE', person.birth.gedcom()))
+        if person.birth_place:
+            lines.append(Line(2, 'PLAC', person.birth_place))
+    if person.death.is_known or person.death_place:
+        lines.append(Line(1, 'DEAT'))
+        if person.death.is_known:
+            lines.append(Line(2, 'DATE', person.death.gedcom()))
+        if person.death_place:
+            lines.append(Line(2, 'PLAC', person.death_place))
 
     for family_xref, pedigree in person.child_of:
         lines.append(Line(1, 'FAMC', family_xref))

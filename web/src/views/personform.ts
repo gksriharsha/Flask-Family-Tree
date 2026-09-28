@@ -35,6 +35,8 @@ export interface PersonDraft {
   living: 'yes' | 'no' | 'unknown';
   birth: DateDraft;
   death: DateDraft;
+  birthPlace: string;
+  deathPlace: string;
   attachId: number | null;
   attachRelation: 'parent' | 'child' | 'spouse';
   attachRole: LinkRole;
@@ -52,6 +54,8 @@ export function blankDraft(attachId: number | null = null): PersonDraft {
     living: 'unknown',
     birth: { ...EMPTY_DATE },
     death: { ...EMPTY_DATE },
+    birthPlace: '',
+    deathPlace: '',
     attachId,
     attachRelation: 'child',
     attachRole: 'biological',
@@ -59,7 +63,10 @@ export function blankDraft(attachId: number | null = null): PersonDraft {
   };
 }
 
-export function draftFrom(p: PersonNode): PersonDraft {
+export function draftFrom(
+  p: PersonNode,
+  places: { birthPlace?: string; deathPlace?: string } = {},
+): PersonDraft {
   const asDraft = (d: PersonNode['birth']): DateDraft => ({
     mode: d.mode,
     year: d.year === null ? '' : String(d.year),
@@ -75,6 +82,8 @@ export function draftFrom(p: PersonNode): PersonDraft {
     living: p.living === null ? 'unknown' : p.living ? 'yes' : 'no',
     birth: asDraft(p.birth),
     death: asDraft(p.death),
+    birthPlace: places.birthPlace ?? '',
+    deathPlace: places.deathPlace ?? '',
     attachId: null,
     attachRelation: 'child',
     attachRole: 'biological',
@@ -206,6 +215,19 @@ function dateSection(which: 'birth' | 'death', d: DateDraft, legend: string): st
     </section>`;
 }
 
+function placeField(key: 'birthPlace' | 'deathPlace', label: string, value: string): string {
+  // A single free-text place. Read back through the same `data-df` path as the name fields
+  // (syncDraft writes it straight onto the draft), then sent to /people/<id>/places on save.
+  return `
+    <section class="fgroup">
+      <label class="f is-grow">
+        <span class="f-l">${label} <span class="fg-opt">optional</span></span>
+        <input class="f-i" data-df="${key}" value="${escape(value)}" autocomplete="off"
+               placeholder="e.g. Hyderabad, India" />
+      </label>
+    </section>`;
+}
+
 function attachSection(draft: PersonDraft): string {
   if (draft.id !== null) return '';
   const others = (state.graph?.People ?? []).slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -316,7 +338,9 @@ export function renderPersonForm(draft: PersonDraft): string {
           </section>
 
           ${dateSection('birth', draft.birth, 'Born')}
+          ${placeField('birthPlace', 'Place of birth', draft.birthPlace)}
           ${draft.living === 'no' ? dateSection('death', draft.death, 'Died') : ''}
+          ${draft.living === 'no' ? placeField('deathPlace', 'Place of death', draft.deathPlace) : ''}
           ${attachSection(draft)}
           ${linksSection(draft)}
 

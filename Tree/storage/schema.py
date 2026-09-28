@@ -25,7 +25,7 @@ import sqlite3
 log = logging.getLogger(__name__)
 
 #: Bump when the schema changes and add a migration step in :func:`_migrate`.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 #: v1 builds everything. Every statement is idempotent (``IF NOT EXISTS``) so re-applying it
 #: to an already-current database changes nothing.
@@ -101,6 +101,27 @@ CREATE INDEX IF NOT EXISTS ix_person_given        ON person(given COLLATE NOCASE
 CREATE INDEX IF NOT EXISTS ix_kinship_term_lookup ON kinship_term(side, base_term);
 """
 
+#: v2 adds the places a person was born and died, and a table of photographs attached to
+#: people. Both are additive: ``ALTER TABLE ... ADD COLUMN`` leaves every existing row intact
+#: (the new columns are NULL), and the ``photo`` table is new. Appended after v1 and applied
+#: only when the database is below version 2, so an existing tree gains the columns in place
+#: without a rebuild and a fresh tree gets them from v1's run followed immediately by v2's.
+_SCHEMA_V2 = """
+ALTER TABLE person ADD COLUMN birth_place TEXT;
+ALTER TABLE person ADD COLUMN death_place TEXT;
+
+CREATE TABLE IF NOT EXISTS photo (
+    id         INTEGER PRIMARY KEY,
+    filename   TEXT NOT NULL,          -- the stored file's name, under UPLOAD_IMAGE_PATH
+    caption    TEXT NOT NULL DEFAULT '',
+    person_id  INTEGER,                -- the person this photo is of, or NULL if unattached
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_photo_person ON photo(person_id);
+"""
+
 
 def open_database(path: str) -> sqlite3.Connection:
     """Open (or create) a family-tree database, with the schema applied.
@@ -135,5 +156,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if version < 1:
             conn.executescript(_SCHEMA_V1)
             conn.execute('INSERT INTO schema_version(version) VALUES (1)')
-        # Future migrations: `if version < 2: ...; conn.execute('INSERT ... VALUES (2)')`.
+        if version < 2:
+            conn.executescript(_SCHEMA_V2)
+            conn.execute('INSERT INTO schema_version(version) VALUES (2)')
+        # Future migrations: `if version < 3: ...; conn.execute('INSERT ... VALUES (3)')`.
     log.info('Applied schema up to version %d', SCHEMA_VERSION)

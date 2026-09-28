@@ -196,6 +196,12 @@ def create_app(configuration=General_Configuration):
     from Tree.api.routes import api
     app.register_blueprint(api)
 
+    # Places and photographs: the flows the SQLite cutover left unfinished. Registered
+    # unconditionally (no heavy dependency), unlike the optional face-recognition blueprint
+    # below, so a photograph and a birth place are usable whether or not dlib is installed.
+    from Tree.api.flows import flows
+    app.register_blueprint(flows)
+
     # The face feature depends on dlib, which is a source-only build. Registering it
     # conditionally is what lets the core application install and run in one command.
     try:
