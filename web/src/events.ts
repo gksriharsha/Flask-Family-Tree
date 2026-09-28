@@ -9,6 +9,7 @@
  */
 import type { ExportFormat } from './api';
 import { api } from './api';
+import { flowsApi } from './api_flows';
 import { ensureRelationships } from './relationships';
 import { person, state } from './state';
 import { blankDraft, draftFrom } from './views/personform';
@@ -52,7 +53,20 @@ export function installEvents(hooks: EventHooks): void {
     const editPerson = closest(t, 'data-editperson');
     if (editPerson) {
       const target = person(Number(editPerson.dataset.editperson));
-      if (target) openEditor(draftFrom(target), render);
+      if (target) {
+        // Seed the form with the person's stored places. Fetched here rather than carried in
+        // the graph payload, so the whole-tree read stays lean; a failure falls back to blank
+        // place fields rather than blocking the edit.
+        void guard(async () => {
+          let places = {};
+          try {
+            places = await flowsApi.places(target.id);
+          } catch {
+            places = {};
+          }
+          openEditor(draftFrom(target, places), render);
+        });
+      }
       return;
     }
 

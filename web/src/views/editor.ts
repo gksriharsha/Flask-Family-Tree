@@ -6,6 +6,7 @@
  * now passed in rather than closed over, so the sheet no longer needs to live in the shell.
  */
 import { api } from '../api';
+import { flowsApi } from '../api_flows';
 import type { DateValue } from '../api';
 import { state } from '../state';
 import type { DateDraft, PersonDraft } from './personform';
@@ -106,12 +107,24 @@ export async function saveDraft(andAnother: boolean, hooks: EditorHooks): Promis
   await hooks.guard(async () => {
     if (draft.id !== null) {
       await api.editPerson(draft.id, payload);
+      await flowsApi.setPlaces(draft.id, {
+        birthPlace: draft.birthPlace.trim(),
+        deathPlace: draft.living === 'no' ? draft.deathPlace.trim() : '',
+      });
       state.editor = null;
     } else {
       const attachTo = draft.attachId === null
         ? undefined
         : { personId: draft.attachId, relation: draft.attachRelation, role: draft.attachRole };
       const created = await api.addPerson({ ...payload, attachTo });
+      // A place is only sent when one was actually typed, so a new person with no place
+      // recorded makes no extra request.
+      if (draft.birthPlace.trim() || (draft.living === 'no' && draft.deathPlace.trim())) {
+        await flowsApi.setPlaces(created.Person.id, {
+          birthPlace: draft.birthPlace.trim(),
+          deathPlace: draft.living === 'no' ? draft.deathPlace.trim() : '',
+        });
+      }
       state.editor = andAnother ? blankDraft(draft.attachId) : null;
       if (!andAnother) state.selected = created.Person.id;
     }

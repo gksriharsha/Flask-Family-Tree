@@ -105,6 +105,22 @@ which also carries the exported `family.ged`, the vocabulary sidecar, and the me
 is copying the folder back. There is no server to dump and no schema migration to run: opening
 an existing file applies any pending schema step idempotently.
 
+## Photos and places
+
+Every person can record **where they were born and died** and can have **photographs**
+attached — both work with no extra dependency and are stored in the same SQLite file and
+media folder as the rest of the tree.
+
+* **Places** are free text (e.g. `Hyderabad, India`), edited in the add/edit person form and
+  travelling in the exported GEDCOM as a `PLAC` under the birth and death events, so they
+  survive an export/import round-trip and open correctly in other genealogy software.
+* **Photos** are uploaded, captioned, attached to a person and served back through the
+  `/api/v1/photos` endpoints. A photo of a gathering is kept even after one of the people in
+  it is removed — deleting a person detaches their photos rather than destroying them.
+
+Face *recognition* (below) is an optional layer on top of this; the plain photo and place
+features do not need it.
+
 ## Optional: face recognition
 
 The photo endpoints depend on `dlib`, which is a source-only build needing cmake and a C++

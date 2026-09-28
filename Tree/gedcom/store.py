@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from Tree.gedcom.mapping import parse, to_document
+from Tree.gedcom.mapping import parse_with_places, to_document
 from Tree.gedcom.model import VERSION_7, VERSION_551, MediaObject
 from Tree.gedcom.writer import write_gedcom, write_gedzip
 from Tree.kinship.dates import DateValue
@@ -37,6 +37,7 @@ from Tree.storage import (
     load_vocabulary,
     save_tree_settings,
 )
+from Tree.storage.places import all_places, set_places
 
 log = logging.getLogger(__name__)
 
@@ -154,7 +155,7 @@ def export(conn: sqlite3.Connection, settings: TreeSettings | None = None) -> Pa
     """
     settings = settings or require_settings(conn)
     family = load_family_graph(conn)
-    document = to_document(family, tree_name=settings.name)
+    document = to_document(family, tree_name=settings.name, places=all_places(conn))
     document.media = _media_objects(settings)
 
     write_gedcom(document, settings.gedcom, VERSION_7)
@@ -183,7 +184,7 @@ def export_as(conn: sqlite3.Connection, version: str,
     """Write a copy in another format, for handing to another program."""
     settings = settings or require_settings(conn)
     family = load_family_graph(conn)
-    document = to_document(family, tree_name=settings.name)
+    document = to_document(family, tree_name=settings.name, places=all_places(conn))
     document.media = _media_objects(settings)
     settings.exports.mkdir(parents=True, exist_ok=True)
 
@@ -330,18 +331,28 @@ def import_document(conn: sqlite3.Connection, text: str, replace: bool = False) 
     union, and the recorded birth orders. Nothing about an imported person is stored differently
     from one typed in by hand.
     """
-    family, _ = parse(text)
+    family, _, places = parse_with_places(text)
     if not family.people:
         raise ValueError('No people were found in that file. Is it really a GEDCOM?')
 
     removed = clear_people(conn) if replace else 0
     created = write_family_graph(conn, family)
+    # Places travel beside the graph (they are not part of the engine's Person), so they are
+    # written after the people exist, translated from the parser's file-order ids to the
+    # database ids write_family_graph just assigned.
+    for file_id, place in places.items():
+        db_id = created.get(file_id)
+        if db_id is not None:
+            set_places(conn, db_id,
+                       birth_place=place.get('birthPlace') or '',
+                       death_place=place.get('deathPlace') or '')
     log.info('Imported %d people (replace=%s, removed %d)', len(created), replace, removed)
     return {
         'people': len(created),
         'parentLinks': sum(len(v) for v in family.parents.values()),
         'unions': len(family.unions),
         'birthOrder': len(family.birth_order),
+        'places': len(places),
         'replaced': removed,
     }
 

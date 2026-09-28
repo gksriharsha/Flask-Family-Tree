@@ -55,6 +55,10 @@ class Individual:
     #: Writing a bare year where the record said "about" would be inventing precision.
     birth: DateValue = UNKNOWN_DATE
     death: DateValue = UNKNOWN_DATE
+    #: Free-text places for the birth and death events, written as a ``PLAC`` under each.
+    #: Empty means the record does not say, and nothing is written.
+    birth_place: str = ''
+    death_place: str = ''
     #: (family xref, pedigree) — a person can belong to more than one, which is exactly
     #: how a within-family adoption is represented.
     child_of: list[tuple[str, str]] = field(default_factory=list)
