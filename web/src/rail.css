@@ -1,0 +1,96 @@
+/* ── right rail ──────────────────────────────────────────────────────── */
+.selname { font-family: var(--serif); font-size: 19px; font-weight: 600; line-height: 1.15; }
+.selte { margin-top: 2px; font-family: var(--telugu); font-size: 15px; color: var(--ink-2); }
+.selmeta { margin-top: 5px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.kinbox { margin-top: 10px; border: 1px solid var(--rule); border-radius: var(--r-3); overflow: hidden; }
+.kinvia { padding: 6px 12px; background: var(--surface-2); border-bottom: 1px solid var(--rule); font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2); }
+.kinrow { display: grid; grid-template-columns: 52px 1fr; gap: 10px; align-items: baseline; padding: 10px 12px; }
+.kinrow + .kinrow { border-top: 1px solid var(--rule-soft); }
+.kinrow .tag { font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.kinrow .val { font-family: var(--serif); font-size: 16px; font-weight: 600; line-height: 1.2; }
+.kinrow .val.te { font-family: var(--telugu); font-weight: 500; }
+.kinrow .gloss { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+.kinrow.is-hl { background: var(--olive-soft); }
+.whyrow { display: flex; align-items: center; min-height: calc(2 * 1.5em + 18px); padding: 9px 12px; border-top: 1px solid var(--rule-soft); background: var(--sunk); font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+
+.alsorow { display: flex; flex-wrap: wrap; gap: 5px 8px; padding: 9px 12px; border-top: 1px solid var(--rule-soft); }
+.alsorow .al-l { width: 100%; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); line-height: 1.4; }
+.alsorow button { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 8px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper); }
+.alsorow button:hover { border-color: var(--brown); background: var(--brown-soft); }
+.alsorow button.is-added { border-style: dashed; border-color: var(--olive-line); }
+.alsorow .al-te { font-family: var(--telugu); font-size: 13px; color: var(--ink-2); }
+.alsorow .al-u { font-size: 10.5px; color: var(--muted); }
+.alsorow .al-add { border-style: dashed; border-color: var(--blue); color: var(--blue); font-size: 11.5px; font-weight: 600; }
+
+.pinrow { display: flex; align-items: center; gap: 7px; padding: 8px 12px; border-top: 1px solid var(--rule-soft); background: var(--brown-soft); font-size: 11.5px; font-weight: 600; color: var(--brown); }
+.pinrow button { margin-left: auto; border: none; background: none; color: var(--brown); font-size: 11.5px; font-weight: 700; text-decoration: underline; }
+
+.ask, .addform { margin-top: 10px; padding: 11px 13px; border: 1px solid var(--blue); border-left-width: 3px; border-radius: 0 var(--r-3) var(--r-3) 0; }
+.ask { background: var(--blue-soft); }
+.addform { background: var(--surface); }
+.ask h4, .addform h4 { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--blue); }
+.ask p { margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: var(--blue-ink); }
+.ask .opts { display: flex; flex-direction: column; gap: 6px; }
+.ask .opts button { min-height: 32px; padding: 0 10px; text-align: left; border: 1px solid var(--blue); border-radius: var(--r-2); background: var(--surface); color: var(--blue); font-size: 12.5px; font-weight: 600; }
+.ask .opts button:hover { background: var(--blue-soft-2); }
+.ask .note { margin: 9px 0 0; font-size: 11.5px; color: var(--blue-ink-2); line-height: 1.5; }
+
+.addform input { display: block; width: 100%; height: 32px; margin-bottom: 8px; padding: 0 2px; border: none; border-bottom: 1px solid var(--rule-strong); background: transparent; font: inherit; font-size: 13.5px; }
+.addform input.te { font-family: var(--telugu); font-size: 16px; }
+.addform input:focus { outline: none; border-bottom: 2px solid var(--blue); }
+.addform .row { display: flex; gap: 8px; }
+
+/* ── buttons ─────────────────────────────────────────────────────────────────
+   Base .btn is a filled primary. Variants are is- prefixed so a variant name can
+   never collide with a block (see tools/check_design_css.py). */
+.btn { height: 32px; padding: 0 14px; border: 1px solid var(--blue); border-radius: var(--r-2); background: var(--blue); color: var(--on-accent); font-size: 12.5px; font-weight: 600; }
+.btn:hover { background: var(--blue-strong); border-color: var(--blue-strong); }
+.btn.is-block { width: 100%; }
+/* A quieter surface button (the left-rail exports). */
+.btn.is-ghost { background: var(--surface); color: var(--blue); }
+.btn.is-ghost:hover { background: var(--blue-soft); }
+/* A muted, low-emphasis button (the add-word Cancel), distinct from the blue is-quiet peer
+   in the action stack below. */
+.btn.is-muted { border-color: var(--rule); background: var(--surface); color: var(--muted); }
+.btn.is-muted:hover { border-color: var(--olive-line); background: var(--surface); color: var(--ink-2); }
+
+.multinote { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--olive-line); border-radius: 0 var(--r-2) var(--r-2) 0; background: var(--olive-soft); font-size: 12.5px; color: var(--olive-ink); line-height: 1.55; }
+.warn { margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--amber); background: var(--amber-soft); font-size: 12.5px; color: var(--brown-ink); line-height: 1.55; }
+
+/* ── the action stack ────────────────────────────────────────────────────────
+   Three equal buttons in a 332px rail gave each about 93px, so two labels wrapped
+   out of a 32px button and none of them read as primary. One primary, two peers,
+   one wide row for the action that rewrites every label in the tree. */
+.acts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.acts .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.acts .btn.is-primary { width: 100%; height: 36px; font-size: 13px; }
+.acts-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.acts-pair .btn { height: 34px; padding: 0 8px; }
+.btn.is-quiet { border-color: var(--rule); background: var(--surface); color: var(--blue); }
+.btn.is-quiet:hover { border-color: var(--blue); background: var(--blue-soft); }
+.btn.is-quiet.is-olive { color: var(--olive); }
+.btn.is-quiet.is-olive:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.btn.is-wide {
+  height: auto; padding: 9px 11px; align-items: flex-start; justify-content: flex-start;
+  gap: 9px; text-align: left; border-color: var(--rule); background: var(--surface);
+  color: var(--olive);
+}
+.btn.is-wide:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.btn.is-wide svg { flex: none; margin-top: 1px; }
+.btn.is-wide .w-nm { display: block; font-size: 12.5px; font-weight: 600; }
+.btn.is-wide .w-sub {
+  display: block; margin-top: 2px; font-size: 11px; font-weight: 400;
+  color: var(--muted); line-height: 1.45;
+}
+.btn.is-wide.is-off {
+  border-style: dashed; background: var(--surface-2); color: var(--muted); cursor: default;
+}
+.btn.is-wide.is-off:hover { border-color: var(--rule); background: var(--surface-2); }
+
+/* ── full-screen states (empty tree, first run, loading, error) ──────────────── */
+.state { display: grid; place-items: center; height: 100%; padding: 40px; text-align: center; }
+.state h2 { margin: 0 0 8px; font-family: var(--serif); font-size: 22px; font-weight: 600; }
+.state p { margin: 0 auto 16px; max-width: 46ch; color: var(--ink-2); line-height: 1.6; }
+.state input { width: 320px; max-width: 100%; height: 36px; margin-bottom: 12px; padding: 0 10px; border: 1px solid var(--rule); border-radius: var(--r-2); font: inherit; }
+.err { color: var(--brown); font-size: 13px; }

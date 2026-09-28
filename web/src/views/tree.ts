@@ -28,10 +28,10 @@ import { escapeHtml as escape } from '../dom';
 
 function card(p: PersonNode, compact: boolean): string {
   const classes = ['card'];
-  if (compact) classes.push('compact');
-  if (p.id === state.selected) classes.push('sel');
-  if (p.id === state.root) classes.push('focus');
-  if (isAdoptedInto(p.id)) classes.push('adopt');
+  if (compact) classes.push('is-compact');
+  if (p.id === state.selected) classes.push('is-sel');
+  if (p.id === state.root) classes.push('is-focus');
+  if (isAdoptedInto(p.id)) classes.push('is-adopt');
   if (state.view === 'all' && onOwnLine(p.id)) classes.push('is-ownline');
 
   const first = p.relationships[0];
@@ -101,9 +101,25 @@ function lineageChild(id: number): string {
     </div>`;
 }
 
+/**
+ * The tree exists but holds no one yet — a first-run state inside the shell, distinct from the
+ * "where should this tree live?" screen. It names the next action in the ledger voice.
+ */
+function emptyTree(): string {
+  return `
+    <div class="state">
+      <div>
+        <h2>The tree is empty</h2>
+        <p>No one has been recorded yet. Add the first person — yourself, or the oldest
+           ancestor you know — and the rest of the family hangs from there.</p>
+        <button class="btn is-primary" data-addperson>Add the first person</button>
+      </div>
+    </div>`;
+}
+
 function renderLineage(): string {
   const id = focusId();
-  if (id === null) return '<div class="state"><p>Nothing to show yet.</p></div>';
+  if (id === null) return emptyTree();
   const p = person(id);
   if (!p) return '<div class="state"><p>That person is no longer in the tree.</p></div>';
 
@@ -119,7 +135,8 @@ function renderLineage(): string {
        </div>`;
 
   return `
-    <div class="canvas" data-pan>
+    <div class="canvas" data-pan role="application"
+         aria-label="Family tree — drag to move, use the rails to navigate">
       <div class="canvas-in is-lineage">
         <svg class="wires" aria-hidden="true"></svg>
         <div class="lin-focus">
@@ -154,9 +171,9 @@ function canvasChrome(): string {
  * main.ts mounts the controller into it after the shell is in the DOM.
  */
 function renderAll(): string {
-  if (state.root === null) return '<div class="state"><p>Nothing to show yet.</p></div>';
+  if (state.root === null) return emptyTree();
   if (!state.graph || state.graph.People.length === 0) {
-    return '<div class="state"><p>Nothing to show yet.</p></div>';
+    return emptyTree();
   }
   // The controller fills this host imperatively; the shell never re-renders its interior.
   return `<div class="gcanvas-host" data-tree-all></div>`;

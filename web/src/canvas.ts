@@ -21,8 +21,14 @@
  */
 import { type Connector, type Layout, type LayoutNode, cull } from './layout';
 
-const DESCENT = '#8FAE66';
-const UNION = '#B08A63';
+/* Connector strokes come from the :root tokens (see tokens.css), read once at module load so
+   the view-all wires stay token-driven; the literal is only a non-DOM fallback. */
+const cssVar = (name: string, fallback: string): string => {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+};
+const DESCENT = cssVar('--wire-descent', '#8fae66');
+const UNION = cssVar('--wire-union', '#b08a63');
 
 const MIN_SCALE = 0.15;
 const MAX_SCALE = 2.5;
@@ -59,7 +65,8 @@ export function mountCanvas(
 ): CanvasController {
   container.classList.add('gcanvas');
   container.innerHTML = `
-    <div class="gcanvas-vp" data-pan>
+    <div class="gcanvas-vp" data-pan role="application"
+         aria-label="Whole family tree — drag to move, scroll to zoom">
       <div class="gcanvas-world">
         <svg class="gcanvas-wires" aria-hidden="true"></svg>
         <div class="gcanvas-nodes"></div>

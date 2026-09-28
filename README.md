@@ -164,7 +164,30 @@ used the app.
 ## Development
 
 ```bash
-./venv/bin/python -m pytest tests -q     # unit tests, each against its own temp SQLite file
+./venv/bin/python -m pytest tests -q       # unit tests, each against its own temp SQLite file
 ./venv/bin/ruff check Tree wsgi.py TreeServer.py
-./venv/bin/python tools/check_no_eval.py # fails if eval/exec reappears in the app
+./venv/bin/python tools/check_no_eval.py   # fails if eval/exec reappears in the app
+./venv/bin/python tools/check_design_css.py # fails on a block/variant class collision
 ```
+
+## Design system
+
+The UI is built against a small set of artboards and a shared token block, both under
+[`design/`](design/):
+
+- `design/_tokens.txt` — the canonical palette, type and the derivation notes (including any
+  WCAG-AA contrast adjustments). Every colour, font, radius and spacing value in the web app's
+  `web/src/tokens.css` `:root` mirrors this; nothing else in the stylesheet hard-codes a colour.
+- `design/*.dc.html` — one artboard per screen (Main, ViewAll, Person, AddPerson, RightPanel,
+  Vocabulary, Photo, Register, Mobile, and the connector studies). They are the reference the
+  shipped app is judged against, not something the runtime loads.
+
+The stylesheet is split into files each under the 500-line cap and stitched by one entry
+(`web/src/styles.css` `@import`s `tokens.css`, `shell.css`, `tree.css`, `rail.css`, `sheet.css`,
+`import.css`); Vite bundles them into a single stylesheet at build.
+
+**Class convention.** A block is a plain class (`.card`, `.btn`); a variant or state is
+`is-` prefixed (`.card.is-sel`, `.btn.is-ghost`). A prefixed variant can never collide with a
+block name — the collision that once put a panel's box onto a chip. `tools/check_design_css.py`
+enforces this across both the artboards and `web/src/**/*.css`, and runs in CI, so a future PR
+that reintroduces a collision fails the `test` job.

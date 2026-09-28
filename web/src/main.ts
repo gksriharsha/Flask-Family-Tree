@@ -232,7 +232,7 @@ function leftRail(): string {
       </div>
 
       <div class="rail-sec">
-        <button class="btn wide" data-addperson>Add a person</button>
+        <button class="btn is-primary is-block" data-addperson>Add a person</button>
       </div>
 
       ${state.view === 'lineage' ? spineSection() : ''}
@@ -268,9 +268,9 @@ function leftRail(): string {
         </div>
         <div class="hint">Kept up to date after every change.</div>
         <div class="exports">
-          <button class="btn ghost" data-export="gedzip">GEDZIP <small>with media</small></button>
-          <button class="btn ghost" data-export="gedcom551">GEDCOM 5.5.1 <small>older tools</small></button>
-          <button class="btn ghost" data-export="gedcom7">GEDCOM 7 <small>copy</small></button>
+          <button class="btn is-ghost" data-export="gedzip">GEDZIP <small>with media</small></button>
+          <button class="btn is-ghost" data-export="gedcom551">GEDCOM 5.5.1 <small>older tools</small></button>
+          <button class="btn is-ghost" data-export="gedcom7">GEDCOM 7 <small>copy</small></button>
         </div>
 
         <div class="importer">
@@ -292,7 +292,7 @@ function leftRail(): string {
       <div class="rail-sec">
         <p class="lbl">Key</p>
         <div class="key"><i></i> Descent</div>
-        <div class="key"><i class="adopt"></i> Adoptive descent</div>
+        <div class="key"><i class="is-adopt"></i> Adoptive descent</div>
         <div class="key"><i class="union"></i> Union</div>
         <div class="key"><span class="unres">అ / అ</span> Telugu label needs a fact</div>
       </div>
@@ -318,22 +318,28 @@ function loadedSummary(): string {
 function topBar(): string {
   const shown = state.searchResults.slice(0, SEARCH_SHOWN);
   const more = state.searchResults.length > SEARCH_SHOWN;
-  const results = state.searchResults.length > 0
-    ? `<div class="results">${shown
-        .map(
-          (r) => `<button data-goto="${r.ID}">${escape(r.Firstname)} ${escape(
-            r.Lastname ?? '',
-          )}</button>`,
-        )
-        .join('')}${more ? `<div class="more">Showing ${SEARCH_SHOWN} — refine to narrow.</div>` : ''}</div>`
-    : '';
+  const query = state.search.trim();
+  let results = '';
+  if (state.searchResults.length > 0) {
+    results = `<div class="results">${shown
+      .map(
+        (r) => `<button data-goto="${r.ID}">${escape(r.Firstname)} ${escape(
+          r.Lastname ?? '',
+        )}</button>`,
+      )
+      .join('')}${more ? `<div class="more">Showing ${SEARCH_SHOWN} — refine to narrow.</div>` : ''}</div>`;
+  } else if (query.length >= 2) {
+    // A typed query that found nobody says so, rather than showing an empty dropdown.
+    results = `<div class="results"><div class="empty">No one in the tree matches
+      &ldquo;${escape(query)}&rdquo;. Try the other script, or a shorter part of the name.</div></div>`;
+  }
   return `
     <header class="top">
       <div class="brand">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 21V11" stroke="#3F6D14" stroke-width="1.7" stroke-linecap="round"/>
-          <path d="M12 11C12 6.5 8.5 3.5 4.5 3.5c0 4.5 3 7.5 7.5 7.5Z" stroke="#3F6D14" stroke-width="1.7" stroke-linejoin="round"/>
-          <path d="M12 14c0-3.6 2.8-6 6-6 0 3.6-2.4 6-6 6Z" stroke="#7FA352" stroke-width="1.7" stroke-linejoin="round"/>
+        <svg class="brand-mark" width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path class="bm-1" d="M12 21V11" stroke-width="1.7" stroke-linecap="round"/>
+          <path class="bm-1" d="M12 11C12 6.5 8.5 3.5 4.5 3.5c0 4.5 3 7.5 7.5 7.5Z" stroke-width="1.7" stroke-linejoin="round"/>
+          <path class="bm-2" d="M12 14c0-3.6 2.8-6 6-6 0 3.6-2.4 6-6 6Z" stroke-width="1.7" stroke-linejoin="round"/>
         </svg>
         <span>Family Tree</span>
       </div>

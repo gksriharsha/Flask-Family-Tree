@@ -20,6 +20,11 @@ jobs:
         # The single highest-severity defect in this codebase was eval() on request data.
         # This gate is what stops it coming back.
         run: python tools/check_no_eval.py
+      - name: Guard the design class convention
+        # A block class must never double as an is- variant on another block, in the design
+        # artboards OR the shipped web/src stylesheets. This is what keeps the collisions the
+        # artboards are kept clean of from reappearing in the file the browser actually loads.
+        run: python tools/check_design_css.py
       - name: Tests
         run: pytest -q
 
