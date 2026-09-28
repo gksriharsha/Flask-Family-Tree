@@ -54,42 +54,111 @@ export const state: AppState = {
   searchResults: [],
 };
 
+/* ── derived indexes ────────────────────────────────────────────────────────
+ *
+ * Every read the interface used to make was a linear scan of an array: `person(id)` was
+ * `People.find`, `childrenOf` filtered `ParentLinks`, `spouseOf` searched `Unions`. That is
+ * O(N) per call, and the interface makes those calls per person per render -- which is O(N^2)
+ * over the tree and is exactly what fell over at ten thousand people.
+ *
+ * The graph is now indexed ONCE per load into Maps keyed by id, and every read below is an
+ * O(1) / O(degree) lookup against those Maps. `GraphIndex` is pure data built by
+ * `buildIndex`; the tests exercise it directly without a DOM.
+ */
+export interface GraphIndex {
+  /** id -> person */
+  people: Map<number, PersonNode>;
+  /** child id -> its parent links (parent id + role) */
+  parentsByChild: Map<number, { parent: number; role: string }[]>;
+  /** parent id -> child ids, sorted by birth year (unknown last), then id */
+  childrenByParent: Map<number, number[]>;
+  /** person id -> spouse ids, in union order */
+  spousesByPerson: Map<number, number[]>;
+}
+
+const EMPTY_INDEX: GraphIndex = {
+  people: new Map(),
+  parentsByChild: new Map(),
+  childrenByParent: new Map(),
+  spousesByPerson: new Map(),
+};
+
+let index: GraphIndex = EMPTY_INDEX;
+
+/** Build the derived indexes from a graph payload. Pure -- no DOM, no module state. */
+export function buildIndex(graph: GraphResponse): GraphIndex {
+  const people = new Map<number, PersonNode>();
+  for (const p of graph.People) people.set(p.id, p);
+
+  const parentsByChild = new Map<number, { parent: number; role: string }[]>();
+  const childUnsorted = new Map<number, number[]>();
+  for (const link of graph.ParentLinks) {
+    (parentsByChild.get(link.child) ?? parentsByChild.set(link.child, []).get(link.child)!)
+      .push({ parent: link.parent, role: link.role });
+    // Dedup a child reachable from one parent by two links, matching the old `[...new Set]`.
+    const kids = childUnsorted.get(link.parent) ?? childUnsorted.set(link.parent, []).get(link.parent)!;
+    if (!kids.includes(link.child)) kids.push(link.child);
+  }
+
+  // Sort each parent's children once, by birth year (unknown last) then id -- the same order
+  // the old childrenOf produced, but computed once per load instead of once per call.
+  const childrenByParent = new Map<number, number[]>();
+  for (const [parent, kids] of childUnsorted) {
+    kids.sort((a, b) => {
+      const ya = people.get(a)?.birthYear ?? null;
+      const yb = people.get(b)?.birthYear ?? null;
+      if (ya === null && yb === null) return a - b;
+      if (ya === null) return 1;
+      if (yb === null) return -1;
+      return ya - yb;
+    });
+    childrenByParent.set(parent, kids);
+  }
+
+  const spousesByPerson = new Map<number, number[]>();
+  for (const u of graph.Unions) {
+    const as = spousesByPerson.get(u.a) ?? spousesByPerson.set(u.a, []).get(u.a)!;
+    if (!as.includes(u.b)) as.push(u.b);
+    const bs = spousesByPerson.get(u.b) ?? spousesByPerson.set(u.b, []).get(u.b)!;
+    if (!bs.includes(u.a)) bs.push(u.a);
+  }
+
+  return { people, parentsByChild, childrenByParent, spousesByPerson };
+}
+
+/** Called by the loader after a new graph arrives. Rebuilds the indexes once. */
+export function setGraph(graph: GraphResponse | null): void {
+  state.graph = graph;
+  index = graph ? buildIndex(graph) : EMPTY_INDEX;
+}
+
+/** The live index, for modules (layout) that want to walk it directly. */
+export function graphIndex(): GraphIndex {
+  return index;
+}
+
 /* ── reading the graph ─────────────────────────────────────────────────────── */
 export function person(id: number): PersonNode | undefined {
-  return state.graph?.People.find((p) => p.id === id);
+  return index.people.get(id);
 }
 
 export function parentsOf(id: number, birthsOnly = true): number[] {
-  return (state.graph?.ParentLinks ?? [])
-    .filter((l) => l.child === id && (!birthsOnly || l.role === 'biological'))
+  const links = index.parentsByChild.get(id) ?? [];
+  return links
+    .filter((l) => !birthsOnly || l.role === 'biological')
     .map((l) => l.parent);
 }
 
 export function isAdoptedInto(id: number): boolean {
-  return (state.graph?.ParentLinks ?? []).some((l) => l.child === id && l.role !== 'biological');
+  return (index.parentsByChild.get(id) ?? []).some((l) => l.role !== 'biological');
 }
 
 export function childrenOf(id: number): number[] {
-  const ids = (state.graph?.ParentLinks ?? [])
-    .filter((l) => l.parent === id)
-    .map((l) => l.child);
-  const unique = [...new Set(ids)];
-  // Unknown birth years sort last in a stable order, rather than by a number that
-  // does not exist.
-  return unique.sort((a, b) => {
-    const ya = person(a)?.birthYear ?? null;
-    const yb = person(b)?.birthYear ?? null;
-    if (ya === null && yb === null) return a - b;
-    if (ya === null) return 1;
-    if (yb === null) return -1;
-    return ya - yb;
-  });
+  return index.childrenByParent.get(id) ?? [];
 }
 
 export function spouseOf(id: number): number | undefined {
-  const union = (state.graph?.Unions ?? []).find((u) => u.a === id || u.b === id);
-  if (!union) return undefined;
-  return union.a === id ? union.b : union.a;
+  return index.spousesByPerson.get(id)?.[0];
 }
 
 export interface Frame {

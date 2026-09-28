@@ -1,16 +1,24 @@
 import './styles.css';
-import type { ExportFormat } from './api';
 import { ApiError, api, loadToken, setToken } from './api';
-import { focusId, lineageSpine, person, state } from './state';
-import type { DateDraft, PersonDraft } from './views/personform';
-import { blankDraft, draftFrom, reads, renderPersonForm, sorts } from './views/personform';
+import { escapeHtml as escape } from './dom';
+import {
+  focusId,
+  graphIndex,
+  lineageSpine,
+  person,
+  setGraph,
+  state,
+} from './state';
+import { computeLayout, type Layout } from './layout';
+import { mountCanvas, type CanvasController, type CanvasViewState } from './canvas';
+import { installEvents } from './events';
+import { applyPan, installLineagePan } from './linpan';
+import { drawWires } from './views/wires';
+import { renderPersonForm } from './views/personform';
 import { renderRail } from './views/rail';
-import { renderTree } from './views/tree';
+import { renderCanvasNode, renderTree } from './views/tree';
 
 const root = document.getElementById('app')!;
-const escape = (text: string): string =>
-  text.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /* ── data ──────────────────────────────────────────────────────────────────── */
 async function reload(): Promise<void> {
@@ -27,14 +35,18 @@ async function reload(): Promise<void> {
       return;
     }
     const graph = await api.graph(state.root, state.side);
-    state.graph = graph;
+    setGraph(graph); // rebuilds the Map-based indexes once per load
     state.root = graph.Root;
     if (state.selected === null || !person(state.selected)) {
       state.selected = graph.Root;
     }
     if (state.focus !== null && !person(state.focus)) {
-      state.focus = null;   // they were removed; fall back to the top of the line
+      state.focus = null;
     }
+    // A new graph invalidates the memoised layout and any live canvas.
+    layoutCache = null;
+    disposeCanvas();
+    canvasViewState = null;
   } catch (error) {
     state.error = error instanceof ApiError ? error.message : String(error);
     if (error instanceof ApiError && error.status === 401) state.token = '';
@@ -44,13 +56,45 @@ async function reload(): Promise<void> {
   }
 }
 
+/* ── the scalable view-all canvas ──────────────────────────────────────────── */
+/**
+ * The whole-tree layout is computed once per graph load and reused across every shell
+ * re-render; only the culled window is ever mounted. The canvas controller is recreated when
+ * the shell re-renders (a full innerHTML swap discards its host), but its pan/zoom is carried
+ * across in `canvasViewState`, so selecting a person does not throw the reader back to centre.
+ */
+let layoutCache: Layout | null = null;
+let canvas: CanvasController | null = null;
+let canvasViewState: CanvasViewState | null = null;
+
+function ensureLayout(): Layout {
+  if (!layoutCache && state.graph) {
+    layoutCache = computeLayout(state.graph, graphIndex());
+  }
+  return layoutCache!;
+}
+
+function disposeCanvas(): void {
+  if (canvas) {
+    canvasViewState = canvas.viewState();
+    canvas.destroy();
+    canvas = null;
+  }
+}
+
+/** After the shell is in the DOM, wire the culling canvas into the view-all host. */
+function mountTreeCanvas(): void {
+  disposeCanvas();
+  if (state.view !== 'all' || !state.graph) return;
+  const host = root.querySelector<HTMLElement>('[data-tree-all]');
+  if (!host) return;
+  canvas = mountCanvas(host, ensureLayout(), (node) => renderCanvasNode(node.id), canvasViewState);
+}
+
 /* ── shell ─────────────────────────────────────────────────────────────────── */
 /**
- * The line of descent currently on the canvas, oldest first.
- *
- * Built from the person in focus rather than from the reader, so descending into an uncle's
- * branch still shows where you are instead of stranding you off your own line. Each step is
- * a button: this is how you walk back up.
+ * The line of descent currently on the canvas, oldest first. Built from the person in focus
+ * so descending into an uncle's branch still shows where you are.
  */
 function spineSection(): string {
   const id = focusId();
@@ -165,14 +209,16 @@ function leftRail(): string {
 }
 
 function topBar(): string {
+  const shown = state.searchResults.slice(0, SEARCH_SHOWN);
+  const more = state.searchResults.length > SEARCH_SHOWN;
   const results = state.searchResults.length > 0
-    ? `<div class="results">${state.searchResults
+    ? `<div class="results">${shown
         .map(
           (r) => `<button data-goto="${r.ID}">${escape(r.Firstname)} ${escape(
             r.Lastname ?? '',
           )}</button>`,
         )
-        .join('')}</div>`
+        .join('')}${more ? `<div class="more">Showing ${SEARCH_SHOWN} — refine to narrow.</div>` : ''}</div>`
     : '';
   return `
     <header class="top">
@@ -205,6 +251,9 @@ function topBar(): string {
     </header>`;
 }
 
+/** Results shown in the typeahead before the "refine to narrow" affordance. */
+const SEARCH_SHOWN = 8;
+
 function firstRun(): string {
   return `
     <div class="state">
@@ -227,6 +276,7 @@ function firstRun(): string {
 
 function render(): void {
   if (!state.token) {
+    disposeCanvas();
     root.innerHTML = `
       <div class="state">
         <div>
@@ -241,15 +291,18 @@ function render(): void {
   }
 
   if (state.treeChecked && state.tree === null) {
+    disposeCanvas();
     root.innerHTML = firstRun();
     return;
   }
 
   if (state.loading && !state.graph) {
+    disposeCanvas();
     root.innerHTML = '<div class="state"><p>Loading the tree…</p></div>';
     return;
   }
   if (state.error && !state.graph) {
+    disposeCanvas();
     root.innerHTML = `<div class="state"><div>
       <h2>Could not load the tree</h2><p class="err">${escape(state.error)}</p>
       <button class="btn" data-retry>Try again</button></div></div>`;
@@ -267,122 +320,19 @@ function render(): void {
     </div>
     ${state.editor ? renderPersonForm(state.editor) : ''}`;
 
-  applyPan();
+  if (state.view === 'lineage') {
+    // The bounded lineage canvas: transform pan + measured connectors.
+    applyPan(root);
+    drawWires(root);
+  } else {
+    // The scalable view-all canvas: culling controller mounted into its host.
+    mountTreeCanvas();
+  }
 
-  drawWires();
-
-  // Typing is not allowed to trigger a re-render, so the caret is only ever restored here --
-  // after a toggle rebuilt the sheet -- rather than on every keystroke.
   if (state.editor) {
     const first = root.querySelector<HTMLInputElement>('.sheet [data-df="given"]');
     if (first && document.activeElement === document.body) first.focus();
   }
-}
-
-/* ── the add/edit sheet ────────────────────────────────────────────────────── */
-/**
- * Copy what has been typed back into the draft before any re-render.
- *
- * The whole interface re-renders from state, so without this a toggle -- switching the date
- * mode, say -- would discard every field the reader had already filled in.
- */
-function syncDraft(): void {
-  const draft = state.editor;
-  if (!draft) return;
-  root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('.sheet [data-df]').forEach((el) => {
-    const key = el.dataset.df!;
-    const value = el.value;
-    if (key === 'attachId') {
-      draft.attachId = value === '' ? null : Number(value);
-      return;
-    }
-    if (key.includes('.')) {
-      const [which, field] = key.split('.') as ['birth' | 'death', keyof DateDraft];
-      (draft[which][field] as string) = value;
-      return;
-    }
-    (draft as unknown as Record<string, string>)[key] = value;
-  });
-}
-
-/**
- * Update the read-back in place as the year is typed.
- *
- * Deliberately not a re-render: rebuilding the sheet on every keystroke would move the caret
- * and lose the field. Only the two preview lines are touched, so the form stays exactly where
- * the reader left it while still showing what the record is about to say.
- */
-function refreshPreview(): void {
-  const draft = state.editor;
-  if (!draft) return;
-  for (const which of ['birth', 'death'] as const) {
-    const box = root.querySelector(`.sheet [data-preview="${which}"]`);
-    if (!box) continue;
-    const value = box.querySelector('.rd-v');
-    const note = box.querySelector('.rd-n');
-    if (value) value.textContent = reads(draft[which]);
-    if (note) note.textContent = sorts(draft[which], which);
-    // An absent date is not rendered as though it were a value.
-    box.classList.toggle('is-blank', draft[which].mode === 'unknown');
-  }
-}
-
-function openEditor(draft: PersonDraft): void {
-  state.editor = draft;
-  state.error = null;
-  render();
-}
-
-/** A draft field as the API wants it: absent stays absent rather than becoming zero. */
-function dateInput(d: DateDraft) {
-  const number = (value: string) => (value.trim() === '' ? null : Number(value));
-  return {
-    mode: d.mode,
-    year: number(d.year),
-    month: number(d.month),
-    day: number(d.day),
-    year2: number(d.year2),
-  };
-}
-
-async function saveDraft(andAnother: boolean): Promise<void> {
-  syncDraft();
-  const draft = state.editor;
-  if (!draft) return;
-  if (!draft.given.trim()) {
-    state.error = 'A person needs a given name.';
-    render();
-    return;
-  }
-
-  const payload = {
-    given: draft.given.trim(),
-    surname: draft.surname.trim(),
-    sex: draft.sex,
-    living: draft.living === 'unknown' ? null : draft.living === 'yes',
-    birth: dateInput(draft.birth),
-    // A death date on somebody recorded as living would contradict itself, so it is only
-    // ever sent when the form is actually showing the field.
-    death: draft.living === 'no' ? dateInput(draft.death) : { mode: 'unknown' as const },
-  };
-
-  await guard(async () => {
-    if (draft.id !== null) {
-      await api.editPerson(draft.id, payload);
-      state.editor = null;
-    } else {
-      const attachTo = draft.attachId === null
-        ? undefined
-        : { personId: draft.attachId, relation: draft.attachRelation, role: draft.attachRole };
-      const created = await api.addPerson({ ...payload, attachTo });
-      state.editor = andAnother
-        ? blankDraft(draft.attachId)
-        : null;
-      if (!andAnother) state.selected = created.Person.id;
-    }
-    state.error = null;
-    await reload();
-  });
 }
 
 /* ── events ────────────────────────────────────────────────────────────────── */
@@ -395,616 +345,18 @@ async function guard(work: () => Promise<void>): Promise<void> {
   }
 }
 
-function closest(target: EventTarget | null, attr: string): HTMLElement | null {
-  return (target as HTMLElement | null)?.closest?.(`[${attr}]`) ?? null;
-}
-
-root.addEventListener('click', (event) => {
-  const t = event.target;
-
-  /* ── the add/edit sheet ──────────────────────────────────────────────────── */
-  const addPerson = closest(t, 'data-addperson');
-  if (addPerson) {
-    const near = addPerson.dataset.addperson;
-    openEditor(blankDraft(near ? Number(near) : null));
-    return;
-  }
-
-  const editPerson = closest(t, 'data-editperson');
-  if (editPerson) {
-    const target = person(Number(editPerson.dataset.editperson));
-    if (target) openEditor(draftFrom(target));
-    return;
-  }
-
-  if (closest(t, 'data-cancelperson')) {
-    state.editor = null;
-    state.error = null;
-    render();
-    return;
-  }
-
-  const dateMode = closest(t, 'data-dm');
-  if (dateMode && state.editor) {
-    syncDraft();
-    const [which, mode] = dateMode.dataset.dm!.split(':') as ['birth' | 'death', DateDraft['mode']];
-    state.editor[which].mode = mode;
-    render();
-    return;
-  }
-
-  const sexButton = closest(t, 'data-sx');
-  if (sexButton && state.editor) {
-    syncDraft();
-    state.editor.sex = sexButton.dataset.sx as typeof state.editor.sex;
-    render();
-    return;
-  }
-
-  const livingButton = closest(t, 'data-lv');
-  if (livingButton && state.editor) {
-    syncDraft();
-    state.editor.living = livingButton.dataset.lv as typeof state.editor.living;
-    render();
-    return;
-  }
-
-  const attachRelation = closest(t, 'data-ar');
-  if (attachRelation && state.editor) {
-    syncDraft();
-    state.editor.attachRelation = attachRelation.dataset.ar as 'parent' | 'child' | 'spouse';
-    render();
-    return;
-  }
-
-  const attachRole = closest(t, 'data-arole');
-  if (attachRole && state.editor) {
-    syncDraft();
-    state.editor.attachRole = attachRole.dataset.arole as 'biological' | 'adoptive';
-    render();
-    return;
-  }
-
-  const save = closest(t, 'data-saveperson');
-  if (save) {
-    void saveDraft(save.dataset.saveperson === 'again');
-    return;
-  }
-
-  if (closest(t, 'data-confirmdelete') && state.editor) {
-    syncDraft();
-    state.editor.confirmingDelete = true;
-    render();
-    return;
-  }
-  if (closest(t, 'data-canceldelete') && state.editor) {
-    state.editor.confirmingDelete = false;
-    render();
-    return;
-  }
-  const doDelete = closest(t, 'data-deleteperson');
-  if (doDelete && state.editor?.id !== null && state.editor !== null) {
-    const id = state.editor.id;
-    void guard(async () => {
-      await api.removePerson(id);
-      state.editor = null;
-      if (state.selected === id) state.selected = null;
-      if (state.root === id) state.root = null;
-      await reload();
-    });
-    return;
-  }
-
-  const unlinkParent = closest(t, 'data-unlinkparent');
-  if (unlinkParent) {
-    const [childId, parentId] = unlinkParent.dataset.unlinkparent!.split(':').map(Number);
-    void guard(async () => {
-      await api.unlinkParent(childId!, parentId!);
-      await reload();
-    });
-    return;
-  }
-
-  const unlinkUnion = closest(t, 'data-unlinkunion');
-  if (unlinkUnion) {
-    const [aId, bId] = unlinkUnion.dataset.unlinkunion!.split(':').map(Number);
-    void guard(async () => {
-      await api.unlinkUnion(aId!, bId!);
-      await reload();
-    });
-    return;
-  }
-
-  const signIn = closest(t, 'data-signin');
-  if (signIn) {
-    const input = document.getElementById('token') as HTMLInputElement | null;
-    if (input?.value) {
-      state.token = input.value.trim();
-      setToken(state.token);
-      void reload();
-    }
-    return;
-  }
-  if (closest(t, 'data-retry')) { void reload(); return; }
-
-  if (closest(t, 'data-createtree')) {
-    const name = (document.getElementById('tree-name') as HTMLInputElement | null)?.value.trim();
-    const location = (document.getElementById('tree-path') as HTMLInputElement | null)?.value.trim();
-    if (!name || !location) {
-      state.error = 'A tree needs a name and a folder.';
-      render();
-      return;
-    }
-    void guard(async () => {
-      state.tree = (await api.createTree(name, location)).Tree;
-      await reload();
-    });
-    return;
-  }
-
-  const importMode = closest(t, 'data-importmode');
-  if (importMode) {
-    state.importReplace = importMode.dataset.importmode === 'replace';
-    render();
-    return;
-  }
-
-  if (closest(t, 'data-doimport')) {
-    const picker = document.getElementById('ged-file') as HTMLInputElement | null;
-    const file = picker?.files?.[0];
-    if (!file) {
-      state.error = 'Choose a .ged, .gedcom or .gdz file first.';
-      render();
-      return;
-    }
-    const replace = state.importReplace;
-    void guard(async () => {
-      const summary = (await api.importTree(file, replace)).Result;
-      const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-      state.notice = `Imported ${plural(summary.people, 'person', 'people')}`
-        + `, ${plural(summary.parentLinks, 'parent link', 'parent links')}`
-        + ` and ${plural(summary.unions, 'union', 'unions')} from ${file.name}`
-        + (summary.replaced
-            ? ` — ${plural(summary.replaced, 'previous person', 'previous people')} removed`
-            : '');
-      state.error = null;
-      // The tree that was on screen may be gone entirely, so start from whatever the
-      // reimported graph says its root is rather than from a stale id.
-      state.root = null;
-      state.focus = null;
-      state.selected = null;
-      state.open.clear();
-      resetPan();
-      await reload();
-    });
-    return;
-  }
-
-  const exporter = closest(t, 'data-export');
-  if (exporter) {
-    const format = exporter.dataset.export as ExportFormat;
-    void guard(async () => {
-      const written = await api.exportTree(format);
-      state.notice = `Wrote ${written.Path} (${Math.round(written.Bytes / 102.4) / 10} kB)`;
-      render();
-    });
-    return;
-  }
-
-  const personButton = closest(t, 'data-person');
-  if (personButton) {
-    state.selected = Number(personButton.dataset.person);
-    state.addingWord = false;
-    render();
-    return;
-  }
-
-  const opener = closest(t, 'data-open');
-  if (opener) {
-    state.open.add(Number(opener.dataset.open));
-    render();
-    return;
-  }
-
-  const reroot = closest(t, 'data-reroot');
-  if (reroot) {
-    state.root = Number(reroot.dataset.reroot);
-    state.open.clear();
-    state.focus = null;   // a new reference point means a new line
-    void reload();
-    return;
-  }
-
-  const view = closest(t, 'data-view');
-  if (view) {
-    state.view = view.dataset.view as typeof state.view;
-    resetPan();
-    render();
-    return;
-  }
-
-  const focusStep = closest(t, 'data-focus');
-  if (focusStep) {
-    state.focus = Number(focusStep.dataset.focus);
-    state.selected = state.focus;
-    resetPan();
-    render();
-    return;
-  }
-
-  const showLine = closest(t, 'data-showline');
-  if (showLine) {
-    // Put this person's own line on the canvas, whichever mode we were in.
-    state.view = 'lineage';
-    state.focus = Number(showLine.dataset.showline);
-    resetPan();
-    render();
-    return;
-  }
-
-  if (closest(t, 'data-recentre')) {
-    resetPan();
-    applyPan();
-    return;
-  }
-
-  const side = closest(t, 'data-side');
-  if (side) {
-    state.side = side.dataset.side as typeof state.side;
-    void reload();
-    return;
-  }
-
-  const lang = closest(t, 'data-lang');
-  if (lang) {
-    state.lang = lang.dataset.lang as typeof state.lang;
-    render();
-    return;
-  }
-
-  const goto = closest(t, 'data-goto');
-  if (goto) {
-    state.selected = Number(goto.dataset.goto);
-    state.search = '';
-    state.searchResults = [];
-    render();
-    return;
-  }
-
-  const elder = closest(t, 'data-elder');
-  if (elder) {
-    const elderId = Number(elder.dataset.elder);
-    const youngerId = Number(elder.dataset.younger);
-    void guard(async () => {
-      await api.recordBirthOrder(elderId, youngerId);
-      await reload();
-    });
-    return;
-  }
-
-  const pin = closest(t, 'data-pin');
-  if (pin && state.selected !== null) {
-    const [linkIndex, altIndex] = pin.dataset.pin!.split(':').map(Number);
-    const target = person(state.selected);
-    const alt = target?.relationships[linkIndex!]?.alternatives[altIndex!];
-    if (alt) {
-      const personId = state.selected;
-      void guard(async () => {
-        await api.pinTerm(personId, alt.base, alt.term, alt.roman, state.side);
-        await reload();
-      });
-    }
-    return;
-  }
-
-  const unpin = closest(t, 'data-unpin');
-  if (unpin && state.selected !== null) {
-    const target = person(state.selected);
-    const bases = target?.relationships[Number(unpin.dataset.unpin)]?.bases ?? [];
-    const personId = state.selected;
-    void guard(async () => {
-      for (const base of bases) await api.unpinTerm(personId, base);
-      await reload();
-    });
-    return;
-  }
-
-  if (closest(t, 'data-addword')) { state.addingWord = true; render(); return; }
-  if (closest(t, 'data-cancelword')) { state.addingWord = false; render(); return; }
-
-  if (closest(t, 'data-saveword') && state.selected !== null) {
-    const word = (document.getElementById('word-te') as HTMLInputElement | null)?.value.trim();
-    const usage = (document.getElementById('word-use') as HTMLInputElement | null)?.value.trim();
-    const base = person(state.selected)?.relationships[0]?.bases[0];
-    if (word && base) {
-      void guard(async () => {
-        await api.addWord(base, word, '', usage ?? '', state.side);
-        state.addingWord = false;
-        await reload();
-      });
-    }
-    return;
-  }
+// Lineage-only: connectors are measured from the live DOM, so re-measure on resize.
+window.addEventListener('resize', () => {
+  if (state.view === 'lineage') drawWires(root);
 });
 
-let searchTimer: number | undefined;
-root.addEventListener('input', (event) => {
-  const input = event.target as HTMLInputElement;
-
-  if (state.editor && input.dataset.df) {
-    syncDraft();
-    // Choosing somebody to attach to reveals the relation and role choices, so that one field
-    // needs a real re-render. Every other field only moves the read-back, which is patched in
-    // place so the caret stays where it is.
-    if (input.dataset.df === 'attachId') render();
-    else refreshPreview();
-    return;
-  }
-
-  if (input.id !== 'search') return;
-  state.search = input.value;
-  window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(() => {
-    const query = state.search.trim();
-    if (query.length < 2) {
-      state.searchResults = [];
-      render();
-      return;
-    }
-    void guard(async () => {
-      state.searchResults = (await api.search(query)).Data.slice(0, 8);
-      render();
-      (document.getElementById('search') as HTMLInputElement | null)?.focus();
-    });
-  }, 220);
-});
-
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && state.editor) {
-    state.editor = null;
-    state.error = null;
-    render();
-  }
-});
-
-/* ── connectors ────────────────────────────────────────────────────────────── */
-/**
- * Draw the descent and marriage lines by measuring where the cards actually are.
- *
- * They used to be CSS pseudo-elements positioned at percentages -- a horizontal bar at
- * `left:16%; right:16%` with ticks dropping from each child. Those percentages have nothing
- * to do with where the children sit, so the bar overshot the outer children by tens of
- * pixels, and unevenly, because a child block is wider when a spouse pill is attached to it.
- * Measuring is the only way the line meets the card it claims to join.
- *
- * Descent is one curve per child rather than a bar with ticks: no bar means no bar to
- * misalign, and a curve carries a 1.25px stroke where a right angle would look broken.
- * Marriage is a double rule -- the mark genealogy has used for it for centuries -- in a warm
- * neutral, so a union differs from a descent in colour as well as in form.
- */
-const DESCENT = '#8FAE66';
-const UNION = '#B08A63';
-
-function drawWires(): void {
-  const canvases = root.querySelectorAll<HTMLElement>('.canvas-in');
-  for (const canvas of canvases) {
-    const svg = canvas.querySelector('svg.wires');
-    if (!svg || !state.graph) continue;
-
-    const base = canvas.getBoundingClientRect();
-    // A person shows as a card or, when they married in, as a pill. Either is an endpoint.
-    const nodes = new Map<number, DOMRect>();
-    for (const el of canvas.querySelectorAll<HTMLElement>('[data-person]')) {
-      const id = Number(el.dataset.person);
-      if (!nodes.has(id)) nodes.set(id, el.getBoundingClientRect());
-    }
-
-    const parts: string[] = [];
-
-    const pairKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
-    const married = new Set(state.graph.Unions.map((u) => pairKey(u.a, u.b)));
-
-    const byChild = new Map<number, { parent: number; role: string }[]>();
-    for (const link of state.graph.ParentLinks) {
-      if (!nodes.has(link.parent) || !nodes.has(link.child)) continue;
-      const list = byChild.get(link.child) ?? [];
-      list.push({ parent: link.parent, role: link.role });
-      byChild.set(link.child, list);
-    }
-
-    // Gather by the couple (or lone parent) the children issue from, so one trunk and one
-    // sibling bar can serve all of them -- which is what a genealogy chart looks like.
-    interface Origin { x: number; y: number; kids: { x: number; y: number; dashed: boolean }[] }
-    const origins = new Map<string, Origin>();
-    const at = (key: string, x: number, y: number) => {
-      const found = origins.get(key) ?? { x, y, kids: [] };
-      found.y = Math.max(found.y, y);
-      origins.set(key, found);
-      return found;
-    };
-
-    for (const [childId, links] of byChild) {
-      const to = nodes.get(childId)!;
-      const cx = to.left + to.width / 2 - base.left;
-      const cy = to.top - base.top;
-      const spent = new Set<number>();
-
-      for (let i = 0; i < links.length; i++) {
-        for (let j = i + 1; j < links.length; j++) {
-          const a = links[i]!;
-          const b = links[j]!;
-          if (spent.has(a.parent) || spent.has(b.parent)) continue;
-          if (!married.has(pairKey(a.parent, b.parent))) continue;
-          const ra = nodes.get(a.parent)!;
-          const rb = nodes.get(b.parent)!;
-          const [l, r] = ra.left <= rb.left ? [ra, rb] : [rb, ra];
-          at(pairKey(a.parent, b.parent), (l.right + r.left) / 2 - base.left,
-             Math.max(l.bottom, r.bottom) - base.top)
-            .kids.push({ x: cx, y: cy,
-                         dashed: a.role !== 'biological' || b.role !== 'biological' });
-          spent.add(a.parent);
-          spent.add(b.parent);
-        }
-      }
-      for (const link of links) {
-        if (spent.has(link.parent)) continue;
-        const from = nodes.get(link.parent)!;
-        at(`p${link.parent}`, from.left + from.width / 2 - base.left, from.bottom - base.top)
-          .kids.push({ x: cx, y: cy, dashed: link.role !== 'biological' });
-      }
-    }
-
-    for (const origin of origins.values()) {
-      const kids = origin.kids.filter((k) => k.y > origin.y + 6);
-      if (kids.length === 0) continue;
-
-      // The sibling bar sits midway down and spans exactly the children it joins -- measured,
-      // so it can never overshoot them the way a percentage did.
-      const bar = origin.y + (Math.min(...kids.map((k) => k.y)) - origin.y) / 2;
-      const left = Math.min(origin.x, ...kids.map((k) => k.x));
-      const right = Math.max(origin.x, ...kids.map((k) => k.x));
-
-      const stroke = `stroke="${DESCENT}" stroke-width="1.1" stroke-linecap="square"`;
-      parts.push(`<path d="M${origin.x} ${origin.y}V${bar}" fill="none" ${stroke} />`);
-      if (right - left > 0.5) {
-        parts.push(`<path d="M${left} ${bar}H${right}" fill="none" ${stroke} />`);
-      }
-      for (const kid of kids) {
-        // The shared trunk is shared; the role belongs to the individual link, so only the
-        // child's own drop is dashed.
-        const dash = kid.dashed ? ' stroke-dasharray="4 3"' : '';
-        parts.push(`<path d="M${kid.x} ${bar}V${kid.y}" fill="none" ${stroke}${dash} />`);
-      }
-      parts.push(`<circle cx="${origin.x}" cy="${origin.y}" r="2" fill="${DESCENT}" />`);
-    }
-
-    for (const union of state.graph.Unions) {
-      const a = nodes.get(union.a);
-      const b = nodes.get(union.b);
-      if (!a || !b) continue;
-      const [left, right] = a.left <= b.left ? [a, b] : [b, a];
-      const gap = right.left - left.right;
-      if (gap < 6 || gap > 80) continue;   // not drawn side by side on this canvas
-      const x1 = left.right - base.left;
-      const x2 = right.left - base.left;
-      const y = (Math.max(left.top, right.top) + Math.min(left.bottom, right.bottom)) / 2
-              - base.top;
-      parts.push(`<path d="M${x1} ${y - 2.5}H${x2}M${x1} ${y + 2.5}H${x2}"`
-               + ` stroke="${UNION}" stroke-width="1.1" stroke-linecap="round" />`);
-    }
-
-    svg.setAttribute('width', String(canvas.scrollWidth));
-    svg.setAttribute('height', String(canvas.scrollHeight));
-    svg.setAttribute('viewBox', `0 0 ${canvas.scrollWidth} ${canvas.scrollHeight}`);
-    svg.innerHTML = parts.join('');
-  }
-}
-
-window.addEventListener('resize', () => drawWires());
-
-/* ── move the tree ─────────────────────────────────────────────────────────── */
-/**
- * The canvas is moved by translating its contents, not by scrolling them.
- *
- * Scrolling was the first attempt, and it only works when the tree is bigger than the window.
- * The lineage view shows one generation, which fits -- so there was nothing to scroll and
- * dragging did nothing at all, while a hint sat there promising otherwise. A transform always
- * has somewhere to go, which is what "move the tree to the part I want" actually asks for.
- *
- * The offset is clamped so a corner of the tree always stays on screen: free panning is only
- * pleasant when you cannot throw the thing into the void.
- */
-const DRAG_SLOP = 4;
-const KEEP_VISIBLE = 150;
-
-let suppressClick = false;
-let panOffset = { x: 0, y: 0 };
-let drag: { x: number; y: number; ox: number; oy: number; moved: boolean } | null = null;
-
-function applyPan(): void {
-  const canvas = root.querySelector<HTMLElement>('.canvas');
-  const inner = canvas?.querySelector<HTMLElement>('.canvas-in');
-  if (!canvas || !inner) return;
-  // Clamping stores what it computes, so measuring before the canvas has been laid out would
-  // bake a nonsense offset in permanently -- which is exactly what happened: a pass during
-  // loading, when the canvas was 0px tall, pinned the tree 150px off the top of the screen.
-  if (canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
-
-  // How much must stay on screen. Held to half the viewport and half the content as well as
-  // to a flat maximum, because the canvas is far shorter than it is wide: a flat 150px is a
-  // fifth of the width but can be most of the height, which squeezed the vertical range to
-  // almost nothing and made the tree feel as though it only moved sideways.
-  const limit = (offset: number, content: number, view: number) => {
-    const keep = Math.min(KEEP_VISIBLE, view / 2, content / 2);
-    const lo = keep - content;
-    const hi = view - keep;
-    // A viewport smaller than what we insist on keeping would invert the range and pin the
-    // tree; centring it is the sane answer.
-    if (lo > hi) return (view - content) / 2;
-    return Math.max(lo, Math.min(hi, offset));
-  };
-  panOffset.x = limit(panOffset.x, inner.offsetWidth, canvas.clientWidth);
-  panOffset.y = limit(panOffset.y, inner.offsetHeight, canvas.clientHeight);
-  inner.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px)`;
-}
-
-/** Going somewhere new -- another view, another generation -- starts from centre again. */
-function resetPan(): void {
-  panOffset = { x: 0, y: 0 };
-}
-
-root.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0) return;
-  if (!(event.target as HTMLElement | null)?.closest?.('[data-pan]')) return;
-  drag = { x: event.clientX, y: event.clientY, ox: panOffset.x, oy: panOffset.y, moved: false };
-});
-
-window.addEventListener('pointermove', (event) => {
-  if (!drag) return;
-  const dx = event.clientX - drag.x;
-  const dy = event.clientY - drag.y;
-  if (!drag.moved && Math.abs(dx) < DRAG_SLOP && Math.abs(dy) < DRAG_SLOP) return;
-  if (!drag.moved) {
-    drag.moved = true;
-    root.querySelector('.canvas')?.classList.add('is-panning');
-  }
-  panOffset = { x: drag.ox + dx, y: drag.oy + dy };
-  applyPan();
-});
-
-window.addEventListener('pointerup', () => {
-  if (!drag) return;
-  root.querySelector('.canvas')?.classList.remove('is-panning');
-  // A drag that ended over a card must not also select that card. The browser fires that
-  // click synchronously after pointerup, so the flag is dropped on the next tick: otherwise a
-  // drag that happens to end over nothing leaves it set, and the reader's next real click --
-  // on a card, on Recentre -- is silently eaten.
-  if (drag.moved) {
-    suppressClick = true;
-    setTimeout(() => { suppressClick = false; }, 0);
-  }
-  drag = null;
-});
-
-// The wheel moves it too, so a trackpad works without holding the button down.
-root.addEventListener('wheel', (event) => {
-  if (!(event.target as HTMLElement | null)?.closest?.('[data-pan]')) return;
-  event.preventDefault();
-  panOffset = { x: panOffset.x - event.deltaX, y: panOffset.y - event.deltaY };
-  applyPan();
-}, { passive: false });
-
-window.addEventListener('resize', () => applyPan());
-
-root.addEventListener('click', (event) => {
-  if (!suppressClick) return;
-  suppressClick = false;
-  event.stopPropagation();
-  event.preventDefault();
-}, true);
+installEvents({ root, render, reload, guard, setToken });
+installLineagePan(root);
 
 /* ── boot ──────────────────────────────────────────────────────────────────── */
 state.token = loadToken();
 if (state.token) setToken(state.token);
 render();
 if (state.token) void reload();
+
+// Re-export nothing; this module is the entry point.

@@ -561,3 +561,24 @@ select.f-i { height: 38px; }
 .importer .seg button[data-importmode='replace'][aria-pressed='true'] {
   background: var(--brown); color: #fff;
 }
+
+/* ── scalable view-all canvas ────────────────────────────────────────────────
+   The whole tree is laid out in layout space; only the nodes inside the viewport are
+   mounted (see canvas.ts + layout.ts). The viewport is the clip box, the world is the
+   transformed layer that pan/zoom moves, and each .gnode is absolutely positioned by
+   layout coordinates. Cards reuse the same vocabulary as the bounded canvas. */
+.gcanvas { position: relative; flex: 1; min-width: 0; height: 100%; }
+.gcanvas-vp {
+  position: absolute; inset: 0; overflow: hidden; cursor: grab;
+  background: var(--paper);
+  background-image: radial-gradient(var(--rule-soft) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.gcanvas.is-panning .gcanvas-vp { cursor: grabbing; user-select: none; }
+.gcanvas.is-panning .card { pointer-events: none; }
+.gcanvas-world { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+.gcanvas-wires { position: absolute; top: 0; left: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.gcanvas-nodes { position: absolute; top: 0; left: 0; z-index: 1; }
+/* Each node is a fixed box the layout sized; the card fills it. */
+.gnode { position: absolute; }
+.gnode > .card { width: 100%; height: 100%; }
