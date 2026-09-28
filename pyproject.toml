@@ -5,10 +5,10 @@ exclude = ["venv", ".venv", "tests/_data"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
-# The module and function names (Tree, gremlin_Interface, add_person_endpoint, createPersonObject)
-# are the project's established conventions and are part of the public surface the Angular client
-# and the CLI already use. Renaming them is a separate, mechanical change; pep8-naming is not
-# enabled so that lint stays a signal about defects rather than a wall of style noise.
+# The module and function names (Tree, createPersonObject, convert_to_gremlin_node) are the
+# project's established conventions and are part of the public surface the client and the CLI
+# already use. Renaming them is a separate, mechanical change; pep8-naming is not enabled so
+# that lint stays a signal about defects rather than a wall of style noise.
 ignore = [
     "B008",    # Flask/Click patterns legitimately call functions in defaults
     "RUF012",  # Configuration classes intentionally hold mutable class attributes
@@ -23,4 +23,3 @@ ignore = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-filterwarnings = ["ignore::DeprecationWarning:gremlin_python.*"]

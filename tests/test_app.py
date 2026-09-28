@@ -9,29 +9,40 @@ from Tree.config import Configuration
 
 class _Config(Configuration):
     API_TOKEN = 'test-token'
-    INJECT_GROOVY_AT_STARTUP = False
     CORS_ALLOWED_ORIGINS = ['http://localhost:4200']
 
 
 @pytest.fixture()
-def client():
-    app = create_app(_Config)
+def client(tmp_path):
+    class _C(_Config):
+        DATABASE_PATH = tmp_path / 'family.sqlite'
+    app = create_app(_C)
     app.config['TESTING'] = True
     return app.test_client()
 
 
 def test_app_boots_without_a_database(client):
     """create_app used to submit functions.groovy synchronously and call sys.exit(1) on
-    failure, so the factory could not complete without Gremlin Server -- and under gunicorn
-    that was a respawn loop."""
+    failure, so the factory could not complete without a live backend. It now opens a plain
+    SQLite file lazily per request, so the factory always completes and /health never touches
+    the store."""
     assert client.get('/health').status_code == 200
 
 
-def test_every_route_requires_the_token_except_health(client):
-    assert client.get('/query/count_people').status_code == 401
-    assert client.post('/get/person', json={'ID': 1}).status_code == 401
-    assert client.delete('/delete/nodes/1').status_code == 401
+def test_ready_reports_the_database_is_reachable(client):
+    """A fresh SQLite file is created and the schema applied on first connection, so /ready
+    answers 200 against a brand-new database."""
+    response = client.get('/ready')
+    assert response.status_code == 200
+    assert response.get_json()['Message'] == 'ready'
+
+
+def test_every_api_route_requires_the_token_except_health(client):
+    assert client.get('/api/v1/graph').status_code == 401
+    assert client.post('/api/v1/people', json={'given': 'A'}).status_code == 401
+    assert client.delete('/api/v1/people/1').status_code == 401
     assert client.get('/health').status_code == 200
+    assert client.get('/ready').status_code == 200
 
 
 def test_token_is_accepted_via_either_header(client):
@@ -49,12 +60,17 @@ def test_the_interface_shell_is_public_but_the_api_is_not(client):
     assert client.get('/api/v1/graph').status_code == 401
 
 
-def test_debug_endpoints_are_gone(client):
+def test_the_debug_and_legacy_endpoints_are_gone(client):
+    """The unauthenticated whole-database wipe (/delete/nodes/all), the /spoc reseed routes,
+    and the 2021 blueprints (/get/person, /query/*, /add/person) are removed entirely — they
+    are no longer routable at all."""
     headers = {'X-API-Token': 'test-token'}
     for path in ('/spoc', '/spoc2', '/spoc3', '/spoc4'):
         assert client.get(path, headers=headers).status_code == 404
-    # The unauthenticated whole-database wipe is no longer routable.
     assert client.delete('/delete/nodes/all', headers=headers).status_code == 404
+    assert client.delete('/delete/nodes/1', headers=headers).status_code == 404
+    assert client.post('/get/person', json={'ID': 1}, headers=headers).status_code == 404
+    assert client.get('/query/count_people', headers=headers).status_code == 404
 
 
 def test_cors_is_an_allowlist_not_a_wildcard(client):
@@ -67,15 +83,18 @@ def test_cors_is_an_allowlist_not_a_wildcard(client):
 def test_json_body_is_parsed_not_evaluated(client):
     headers = {'X-API-Token': 'test-token'}
     # A bare Python expression is no longer a valid body, and is certainly not executed.
-    response = client.post('/get/person', data='__import__("os").getpid()',
+    response = client.post('/api/v1/people', data='__import__("os").getpid()',
                            content_type='application/json', headers=headers)
     assert response.status_code == 400
     assert 'JSON' in response.get_json()['Message']
 
 
 def test_malformed_id_is_a_400_not_a_500(client):
-    response = client.post('/get/person', json={'ID': 'all'},
-                           headers={'X-API-Token': 'test-token'})
+    """A non-integer id on a typed-int route is a 404 (no route matches); a bad id in a body
+    field is a 400 from validation, never a 500 and never executed."""
+    headers = {'X-API-Token': 'test-token'}
+    response = client.post('/api/v1/birth-order',
+                           json={'elder_id': 'all', 'younger_id': 2}, headers=headers)
     assert response.status_code == 400
 
 

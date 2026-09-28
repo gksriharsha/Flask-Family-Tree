@@ -1,8 +1,10 @@
 """The API the interface is built on.
 
-One call returns the whole tree already labelled. The old shape needed a round trip per
-person and returned a flat relations dictionary, which is why a multi-generation chart was
-never buildable against it.
+One call returns the whole tree already labelled. The store is SQLite (:mod:`Tree.storage`),
+reached through a per-request connection (:func:`Tree.db.get_db`). The store write functions
+are imported by name into this module so that tests can monkeypatch ``routes.create_person``
+and friends; keep them importable here. Request validation and JSON shaping live in
+:mod:`Tree.api.helpers`; this module is the routing and orchestration layer only.
 """
 
 import logging
@@ -10,7 +12,15 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, request
 
-from Tree import g
+from Tree.api.helpers import (
+    ROLES,
+    link_json,
+    link_request,
+    person_json,
+    person_payload,
+    side_arg,
+)
+from Tree.db import get_db
 from Tree.gedcom.model import VERSION_7, VERSION_551
 from Tree.gedcom.store import (
     ARCHIVE_SUFFIXES,
@@ -24,16 +34,10 @@ from Tree.gedcom.store import (
     load_settings,
     read_gedcom_text,
 )
-from Tree.kinship import (
-    explain,
-    relationships,
-    render_english,
-    render_telugu,
-    unresolved_seniority,
-)
-from Tree.kinship.dates import UNKNOWN_DATE, DateValue
-from Tree.kinship.model import ADOPTIVE, BIOLOGICAL, FEMALE, INTERSEX, MALE, UNKNOWN
-from Tree.kinship.store import (
+from Tree.kinship import relationships, unresolved_seniority
+from Tree.kinship.model import BIOLOGICAL, FEMALE, MALE
+from Tree.kinship.vocabulary import MATERNAL, PATERNAL
+from Tree.storage import (
     add_word,
     create_person,
     delete_person,
@@ -41,14 +45,15 @@ from Tree.kinship.store import (
     link_union,
     load_family_graph,
     load_vocabulary,
+    person_exists,
     pin_term,
     record_birth_order,
+    search_people,
     unlink_parent,
     unlink_union,
     unpin_term,
     update_person,
 )
-from Tree.kinship.vocabulary import MATERNAL, PATERNAL
 from Tree.Utils.http import ApiError, as_vertex_id, json_body, ok
 
 log = logging.getLogger(__name__)
@@ -63,92 +68,17 @@ def _refresh_files() -> None:
     reported as an error because a disk was full or a path went away.
     """
     try:
-        export(g)
+        export(get_db())
     except TreeNotCreated:
         pass
     except Exception:
         log.exception('Could not refresh the tree files.')
 
 
-def _side() -> str:
-    side = (request.args.get('side') or PATERNAL).strip().lower()
-    if side not in (PATERNAL, MATERNAL):
-        raise ApiError(f"side must be '{PATERNAL}' or '{MATERNAL}'.")
-    return side
-
-
-def _person_json(person) -> dict:
-    return {
-        'id': person.id,
-        'given': person.given,
-        'surname': person.surname,
-        'name': person.full_name,
-        'sex': person.sex,
-        'birthYear': person.birth_year,
-        'deathYear': person.death_year,
-        # The full recorded precision, so the interface can show "about 1955" as approximate
-        # rather than rendering it identically to a date somebody actually has a document for.
-        'birth': person.birth_date.to_payload(),
-        'death': person.death_date.to_payload(),
-        'living': person.living,
-    }
-
-
-SEXES = (MALE, FEMALE, INTERSEX, UNKNOWN)
-ROLES = (BIOLOGICAL, ADOPTIVE)
-
-
-def _sex_field(value, default=UNKNOWN):
-    if value is None:
-        return default
-    text = str(value).strip().lower()
-    if text not in SEXES:
-        raise ApiError(f'sex must be one of: {", ".join(SEXES)}')
-    return text
-
-
-def _date_field(payload, field):
-    try:
-        return DateValue.from_payload(payload)
-    except ValueError as exc:
-        raise ApiError(f'{field}: {exc}') from exc
-
-
-def _living_field(value):
-    if value is None or value == 'unknown':
-        return None
-    if isinstance(value, bool):
-        return value
-    text = str(value).strip().lower()
-    if text in ('yes', 'true'):
-        return True
-    if text in ('no', 'false'):
-        return False
-    raise ApiError("living must be true, false, or 'unknown'.")
-
-
-def _link_json(kinship, vocab, person_id, show_via: bool) -> dict:
-    term = vocab.apply(render_telugu(kinship), person_id=person_id)
-    return {
-        'en': render_english(kinship),
-        'te': term.text,
-        'roman': term.roman,
-        'gloss': term.gloss,
-        'unresolved': term.unresolved,
-        'pinned': term.pinned,
-        'bases': list(term.bases),
-        'alternatives': list(term.alternatives),
-        'adoptive': kinship.adoptive,
-        'via': ('Through the adoption' if kinship.adoptive else 'By birth') if show_via else None,
-        'why': explain(kinship),
-        'kind': kinship.kind,
-    }
-
-
 @api.route('/trees', methods=['GET'])
 def get_tree():
     """Where this tree keeps its files, and whether it has been created yet."""
-    settings = load_settings(g)
+    settings = load_settings(get_db())
     if settings is None:
         return ok('No tree yet', Tree=None)
     return ok('Tree found', Tree={
@@ -172,7 +102,7 @@ def post_tree():
     if not name or not location:
         raise ApiError('A tree needs a name and a location.')
     try:
-        settings = create_tree(g, name, location)
+        settings = create_tree(get_db(), name, location)
     except (ValueError, OSError) as exc:
         raise ApiError(str(exc)) from exc
     return ok('Tree created', Tree={'name': settings.name,
@@ -193,36 +123,11 @@ def post_export():
     if version is None:
         raise ApiError("format must be 'gedcom7', 'gedcom551' or 'gedzip'.")
     try:
-        written = export_as(g, version)
+        written = export_as(get_db(), version)
     except TreeNotCreated as exc:
         raise ApiError(str(exc), status=409) from exc
     return ok('Export written', Path=str(written), Format=fmt,
               Bytes=written.stat().st_size)
-
-
-def _ensure_schema() -> None:
-    """Declare the property keys, labels and indexes before writing an imported tree.
-
-    Without a declared schema JanusGraph invents one at write time and guesses cardinality,
-    which is what produced SINGLE/SET conflicts on any property legitimately holding several
-    values. Applying it here is idempotent -- it creates only what is missing -- so an import
-    into an empty database lands in exactly the shape the rest of the app expects rather than
-    in whatever the first write happened to imply.
-    """
-    from Tree import message_serializer
-    from Tree.schema import apply_schema
-    created, conflicts = apply_schema(
-        current_app.config['GREMLIN_DATABASE_URI'],
-        current_app.config['GREMLIN_TRAVERSAL_SOURCE'],
-        wire=message_serializer(current_app.config['GREMLIN_SERIALIZER']),
-    )
-    if created:
-        log.info('Import declared %d missing schema object(s).', len(created))
-    if conflicts:
-        # Writing anyway would half-import and fail partway, which is worse than not starting.
-        raise ApiError(
-            'The database has property keys that conflict with this schema, so an import '
-            'would fail partway through: ' + ', '.join(conflicts), status=409)
 
 
 @api.route('/trees/import', methods=['POST'])
@@ -246,18 +151,16 @@ def post_import():
         data = upload.read()
         if not data:
             raise ApiError('That file is empty.')
-        _ensure_schema()
         try:
-            summary = import_document(g, read_gedcom_text(data, name), replace=replace)
+            summary = import_document(get_db(), read_gedcom_text(data, name), replace=replace)
         except ValueError as exc:
             raise ApiError(str(exc)) from exc
         summary['source'] = name
     else:
         body = json_body(required=('path',))
         replace = str(body.get('mode') or '').strip().lower() == 'replace'
-        _ensure_schema()
         try:
-            summary = import_file(g, str(body['path']).strip(), replace=replace)
+            summary = import_file(get_db(), str(body['path']).strip(), replace=replace)
         except (ValueError, OSError) as exc:
             raise ApiError(str(exc)) from exc
 
@@ -282,18 +185,19 @@ def graph_view():
     ``?root=`` chooses whose relationships are described; ``?side=`` chooses which branch of
     the family's vocabulary to speak in. Neither changes any stored data.
     """
-    family = load_family_graph(g)
+    conn = get_db()
+    family = load_family_graph(conn, limit=current_app.config['MAX_GRAPH_PEOPLE'])
     if not family.people:
         return ok('Tree is empty', People=[], ParentLinks=[], Unions=[],
-                  Root=None, Side=_side())
+                  Root=None, Side=side_arg())
 
-    side = _side()
+    side = side_arg()
     root_param = request.args.get('root')
     root = as_vertex_id(root_param, field='root') if root_param else min(family.people)
     if root not in family.people:
         raise ApiError('No such person.', status=404)
 
-    vocab = load_vocabulary(g, side=side)
+    vocab = load_vocabulary(conn, side=side)
 
     people = []
     open_questions = 0
@@ -303,9 +207,9 @@ def graph_view():
         if pair:
             open_questions += 1
         people.append({
-            **_person_json(person),
+            **person_json(person),
             'relationships': [
-                _link_json(k, vocab, person.id, show_via=len(links) > 1) for k in links
+                link_json(k, vocab, person.id, show_via=len(links) > 1) for k in links
             ],
             'seniorityQuestion': (
                 {'a': pair[0], 'b': pair[1],
@@ -337,22 +241,23 @@ def graph_view():
 @api.route('/people/<int:subject>/relationship-to/<int:other>', methods=['GET'])
 def relationship(subject: int, other: int):
     """Every genuine relationship between two people, not only the closest."""
-    family = load_family_graph(g)
+    conn = get_db()
+    family = load_family_graph(conn, limit=current_app.config['MAX_GRAPH_PEOPLE'])
     for person_id in (subject, other):
         if person_id not in family.people:
             raise ApiError('No such person.', status=404)
 
-    side = _side()
-    vocab = load_vocabulary(g, side=side)
+    side = side_arg()
+    vocab = load_vocabulary(conn, side=side)
     links = relationships(family, subject, other)
     pair = unresolved_seniority(links)
 
     return ok(
         'Relationship found',
-        Subject=_person_json(family.people[subject]),
-        Other=_person_json(family.people[other]),
+        Subject=person_json(family.people[subject]),
+        Other=person_json(family.people[other]),
         Side=side,
-        Relationships=[_link_json(k, vocab, other, show_via=len(links) > 1) for k in links],
+        Relationships=[link_json(k, vocab, other, show_via=len(links) > 1) for k in links],
         SeniorityQuestion=(
             {'a': pair[0], 'b': pair[1],
              'aName': family.people[pair[0]].full_name,
@@ -369,16 +274,17 @@ def set_birth_order():
     The one fact Telugu needs and most records do not hold. Stored as its own fact rather
     than as an invented date.
     """
+    conn = get_db()
     body = json_body(required=('elder_id', 'younger_id'))
     elder = as_vertex_id(body['elder_id'], field='elder_id')
     younger = as_vertex_id(body['younger_id'], field='younger_id')
     if elder == younger:
         raise ApiError('A person cannot be elder than themselves.')
     for person_id in (elder, younger):
-        if not g.V(person_id).hasNext():
+        if not person_exists(conn, person_id):
             raise ApiError('No such person.', status=404)
 
-    record_birth_order(g, elder, younger)
+    record_birth_order(conn, elder, younger)
     log.info('Recorded birth order: %s is elder than %s', elder, younger)
     _refresh_files()
     return ok('Birth order recorded', Elder=elder, Younger=younger)
@@ -386,8 +292,8 @@ def set_birth_order():
 
 @api.route('/vocabulary', methods=['GET'])
 def get_vocabulary():
-    side = _side()
-    vocab = load_vocabulary(g, side=side)
+    side = side_arg()
+    vocab = load_vocabulary(get_db(), side=side)
     return ok(
         'Vocabulary loaded', Side=side,
         Added={base: [
@@ -410,7 +316,7 @@ def post_vocabulary():
     if side not in (PATERNAL, MATERNAL):
         raise ApiError(f"side must be '{PATERNAL}' or '{MATERNAL}'.")
 
-    term_id = add_word(g, base_term, term,
+    term_id = add_word(get_db(), base_term, term,
                        roman=str(body.get('roman') or ''),
                        usage=str(body.get('usage') or ''), side=side)
     _refresh_files()
@@ -424,7 +330,8 @@ def post_pin(person_id: int):
     Optional: the vocabulary already gives everyone else a sensible default. This is for the
     exceptions — the uncle everybody happens to call something else.
     """
-    if not g.V(person_id).hasNext():
+    conn = get_db()
+    if not person_exists(conn, person_id):
         raise ApiError('No such person.', status=404)
     body = json_body(required=('base_term', 'term'))
     base_term = str(body['base_term']).strip()
@@ -433,9 +340,9 @@ def post_pin(person_id: int):
         raise ApiError('base_term and term must not be empty.')
     side = str(body.get('side') or PATERNAL).strip().lower()
 
-    term_id = add_word(g, base_term, term, roman=str(body.get('roman') or ''),
+    term_id = add_word(conn, base_term, term, roman=str(body.get('roman') or ''),
                        usage=str(body.get('usage') or ''), side=side)
-    pin_term(g, person_id, base_term, term_id)
+    pin_term(conn, person_id, base_term, term_id)
     _refresh_files()
     return ok('Term pinned', Person=person_id, BaseTerm=base_term, Term=term)
 
@@ -443,7 +350,7 @@ def post_pin(person_id: int):
 @api.route('/people/<int:person_id>/pinned-term', methods=['DELETE'])
 def delete_pin(person_id: int):
     body = json_body(required=('base_term',))
-    unpin_term(g, person_id, str(body['base_term']).strip())
+    unpin_term(get_db(), person_id, str(body['base_term']).strip())
     _refresh_files()
     return ok('Pin removed', Person=person_id)
 
@@ -457,50 +364,23 @@ def search():
     if not query:
         return ok('People found', Data=[])
 
-    from gremlin_python.process.graph_traversal import __ as anon
-    from gremlin_python.process.traversal import TextP
-    rows = (g.V().hasLabel('Person')
-            .where(anon.has('Firstname', TextP.containing(query)).or_()
-                   .has('Lastname', TextP.containing(query)))
-            .limit(limit)
-            .elementMap('Firstname', 'Lastname', 'Gender').toList())
-    from Tree.Utils.Dictionary_converter import convert2dictionary
-    return ok('People found', Data=convert2dictionary(rows) or [])
+    people = search_people(get_db(), query, limit=limit)
+    # The historical shape: an element-map-style dict per person carrying the graph property
+    # names and the id re-exposed as ``ID``. Built here from the store's Person objects rather
+    # than a Gremlin elementMap, so the client sees exactly what it did before.
+    data = []
+    for person in people:
+        row = {'ID': person.id, 'Firstname': person.given}
+        if person.surname:
+            row['Lastname'] = person.surname
+        gender = {MALE: 'Male', FEMALE: 'Female'}.get(person.sex)
+        if gender:
+            row['Gender'] = gender
+        data.append(row)
+    return ok('People found', Data=data)
 
 
 # ── people ──────────────────────────────────────────────────────────────────────
-def _person_payload(body, creating: bool):
-    """Read the fields a person write accepts, validating each one.
-
-    On create, a given name is required and nothing else is. On update, every field is
-    optional and an absent field means "leave this as it was" -- which is why clearing a date
-    has to be said explicitly, as ``{"mode": "unknown"}``, rather than by omission.
-    """
-    fields = {}
-    if creating or 'given' in body:
-        given = str(body.get('given') or '').strip()
-        if creating and not given:
-            raise ApiError('A person needs a given name.')
-        fields['given'] = given
-    if 'surname' in body:
-        fields['surname'] = str(body.get('surname') or '').strip()
-    if creating or 'sex' in body:
-        fields['sex'] = _sex_field(body.get('sex'))
-    if 'birth' in body:
-        fields['birth'] = _date_field(body.get('birth'), 'birth')
-    if 'death' in body:
-        fields['death'] = _date_field(body.get('death'), 'death')
-    if 'living' in body:
-        fields['living'] = _living_field(body.get('living'))
-
-    birth = fields.get('birth', UNKNOWN_DATE)
-    death = fields.get('death', UNKNOWN_DATE)
-    if (birth.is_known and death.is_known and birth.earliest and death.latest
-            and death.latest < birth.earliest):
-        raise ApiError('That death date falls before the birth date.')
-    return fields
-
-
 @api.route('/people', methods=['POST'])
 def post_person():
     """Add a person, optionally attaching them to somebody already in the tree.
@@ -509,10 +389,11 @@ def post_person():
     fact that is not known -- an unattached person with no dates is a perfectly valid record,
     and is a great deal more useful than one padded out with guesses.
     """
+    conn = get_db()
     body = json_body(required=('given',))
-    fields = _person_payload(body, creating=True)
+    fields = person_payload(body, creating=True)
     try:
-        person_id = create_person(g, **fields)
+        person_id = create_person(conn, **fields)
     except ValueError as exc:
         raise ApiError(str(exc)) from exc
 
@@ -528,11 +409,11 @@ def post_person():
             raise ApiError(f'attachTo.role must be one of: {", ".join(ROLES)}')
         try:
             if relation == 'parent':          # the new person is a parent of `personId`
-                link_parent(g, child_id=other_id, parent_id=person_id, role=role)
+                link_parent(conn, child_id=other_id, parent_id=person_id, role=role)
             elif relation == 'child':         # the new person is a child of `personId`
-                link_parent(g, child_id=person_id, parent_id=other_id, role=role)
+                link_parent(conn, child_id=person_id, parent_id=other_id, role=role)
             elif relation == 'spouse':
-                link_union(g, person_id, other_id)
+                link_union(conn, person_id, other_id)
             else:
                 raise ApiError("attachTo.relation must be 'parent', 'child' or 'spouse'.")
         except ValueError as exc:
@@ -550,11 +431,11 @@ def post_person():
 def patch_person(person_id: int):
     """Change some of a person's details. Absent fields are left alone."""
     body = json_body()
-    fields = _person_payload(body, creating=False)
+    fields = person_payload(body, creating=False)
     if not fields:
         raise ApiError('Nothing to change.')
     try:
-        update_person(g, person_id, **fields)
+        update_person(get_db(), person_id, **fields)
     except ValueError as exc:
         raise ApiError(str(exc), status=404) from exc
     _refresh_files()
@@ -570,7 +451,7 @@ def remove_person(person_id: int):
     of that folder exists. That is the honest position -- there is no undo here yet.
     """
     try:
-        delete_person(g, person_id)
+        delete_person(get_db(), person_id)
     except ValueError as exc:
         raise ApiError(str(exc), status=404) from exc
     _refresh_files()
@@ -578,24 +459,6 @@ def remove_person(person_id: int):
 
 
 # ── relationships ───────────────────────────────────────────────────────────────
-def _link_request(body):
-    kind = str(body.get('type') or '').strip().lower()
-    if kind == 'parent':
-        role = str(body.get('role') or BIOLOGICAL).strip().lower()
-        if role not in ROLES:
-            raise ApiError(f'role must be one of: {", ".join(ROLES)}')
-        return kind, {
-            'child_id': as_vertex_id(body.get('childId'), 'childId'),
-            'parent_id': as_vertex_id(body.get('parentId'), 'parentId'),
-        }, role
-    if kind == 'union':
-        return kind, {
-            'a_id': as_vertex_id(body.get('aId'), 'aId'),
-            'b_id': as_vertex_id(body.get('bId'), 'bId'),
-        }, None
-    raise ApiError("type must be 'parent' or 'union'.")
-
-
 @api.route('/links', methods=['POST'])
 def post_link():
     """Connect two people who are already in the tree.
@@ -604,13 +467,14 @@ def post_link():
     descendant of the proposed child, the link is rejected rather than making somebody their
     own ancestor and sending every ancestor walk to its depth cap.
     """
+    conn = get_db()
     body = json_body(required=('type',))
-    kind, args, role = _link_request(body)
+    kind, args, role = link_request(body)
     try:
         if kind == 'parent':
-            link_parent(g, role=role, **args)
+            link_parent(conn, role=role, **args)
         else:
-            link_union(g, **args)
+            link_union(conn, **args)
     except ValueError as exc:
         raise ApiError(str(exc)) from exc
     _refresh_files()
@@ -620,13 +484,14 @@ def post_link():
 @api.route('/links', methods=['DELETE'])
 def delete_link():
     """Disconnect two people, leaving both of them in the tree."""
+    conn = get_db()
     body = json_body(required=('type',))
-    kind, args, _role = _link_request(body)
+    kind, args, _role = link_request(body)
     try:
         if kind == 'parent':
-            unlink_parent(g, **args)
+            unlink_parent(conn, **args)
         else:
-            unlink_union(g, **args)
+            unlink_union(conn, **args)
     except ValueError as exc:
         raise ApiError(str(exc)) from exc
     _refresh_files()

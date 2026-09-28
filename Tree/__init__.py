@@ -6,9 +6,10 @@ Changes from the original, all of them things that made the app unsafe or unstar
   directory during ``import Tree``, which fired on each worker start, each ``flask shell``, and
   each test collection -- and, under the spawn start method, inside live requests in pool
   children.
-* Gremlin script injection and directory creation happen in the factory, not at import.
-* A failed injection leaves the app *degraded* rather than calling ``sys.exit(1)``, which under
-  gunicorn was a respawn loop.
+* No database connection at import time. The Gremlin version built a traversal source at module
+  import, so importing the package touched configuration and a network address. The store is
+  now a plain SQLite file opened per request (see :mod:`Tree.db`), so importing the package does
+  nothing and each request — and each test — gets its own connection.
 * CORS is registered inside the factory against an explicit origin allowlist. It used to be
   attached inside ``if __name__ == '__main__'``, so no WSGI deployment emitted CORS headers at
   all, and the allowlist was ``*``.
@@ -21,44 +22,12 @@ import os
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
-from gremlin_python.driver import client, serializer
-from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
-from gremlin_python.process.graph_traversal import __
-from gremlin_python.process.traversal import Cardinality, T, TextP
-from gremlin_python.structure.graph import Graph
 
+from Tree import db
 from Tree.config import Configuration as General_Configuration
-from Tree.Utils.GremlinFunction import GroovyInjectionError, inject_functions
 from Tree.Utils.http import ApiError
 
 log = logging.getLogger(__name__)
-
-# DriverRemoteConnection does not open a socket in its constructor -- it stores state and
-# connects lazily on first write -- so building the traversal source at import time is cheap
-# and does not require the database to be up.
-def message_serializer(name):
-    """Resolve the configured wire serializer. See Configuration.GREMLIN_SERIALIZER."""
-    if str(name).lower() in ('graphbinary', 'binary'):
-        return None                      # gremlinpython's default
-    return serializer.GraphSONSerializersV3d0()
-
-
-graph = Graph()
-_serializer = message_serializer(General_Configuration.GREMLIN_SERIALIZER)
-connection = DriverRemoteConnection(
-    General_Configuration.GREMLIN_DATABASE_URI,
-    General_Configuration.GREMLIN_TRAVERSAL_SOURCE,
-    **({'message_serializer': _serializer} if _serializer is not None else {}),
-)
-g = graph.traversal().withRemote(connection)
-
-__all__ = ['Cardinality', 'T', 'TextP', '__', 'client', 'connection', 'create_app', 'g', 'graph']
-
-from Tree.api.routes import api  # noqa: E402  (needs `g` defined above)
-from Tree.base.routes import base  # noqa: E402  (needs `g` defined above)
-from Tree.location.routes import locations  # noqa: E402
-from Tree.people.routes import people  # noqa: E402
-from Tree.relations.routes import relations  # noqa: E402
 
 # The interface shell and its assets: not sensitive, and gating them would mean the
 # browser could never load the page that asks for a token. Every /api call stays gated.
@@ -79,6 +48,11 @@ def _ensure_directories(app):
         path = app.config.get(key)
         if path is not None:
             os.makedirs(path, exist_ok=True)
+    # The database's parent folder, so a first write to a fresh path does not fail because the
+    # directory does not exist yet.
+    database_path = app.config.get('DATABASE_PATH')
+    if database_path is not None:
+        os.makedirs(Path(database_path).parent, exist_ok=True)
 
 
 def _register_auth(app):
@@ -163,52 +137,13 @@ def _register_health(app):
 
     @app.route('/ready')
     def ready():
-        """Readiness. One cheap round-trip plus the Groovy-injection state."""
-        problems = []
+        """Readiness. One cheap round-trip to the database."""
         try:
-            g.V().limit(1).toList()
+            db.get_db().execute('SELECT 1').fetchone()
         except Exception as exc:
-            problems.append(f'gremlin: {exc.__class__.__name__}')
-        if not app.config.get('GROOVY_LOADED', False):
-            problems.append('groovy functions not loaded')
-        if problems:
-            return jsonify({'Message': 'not ready', 'Problems': problems}), 503
+            return jsonify({'Message': 'not ready',
+                            'Problems': [f'sqlite: {exc.__class__.__name__}']}), 503
         return jsonify({'Message': 'ready'}), 200
-
-
-def _load_groovy(app):
-    """Load the server-side Groovy helpers, without making startup fatal.
-
-    Note on deployment: submitting these definitions through a sessionless client works only
-    because Gremlin Server keeps one script engine for all sessionless requests and caches
-    script methods as global closures. That means the definitions are lost whenever Gremlin
-    Server restarts, and are present on only one node behind a load balancer. The supported
-    mechanism is to ship functions.groovy with the server and load it through
-    ScriptFileGremlinPlugin -- see docker-compose.yml. Startup injection is kept for local
-    development against a stock server image.
-    """
-    app.config['GROOVY_LOADED'] = False
-    if not app.config.get('INJECT_GROOVY_AT_STARTUP'):
-        app.logger.info('Startup Groovy injection disabled; expecting server-side init script.')
-        app.config['GROOVY_LOADED'] = True
-        return
-    try:
-        inject_functions(
-            app.config['GREMLIN_DATABASE_URI'],
-            app.config['GREMLIN_TRAVERSAL_SOURCE'],
-            app.config['GROOVY_FUNCTIONS_PATH'],
-            timeout_ms=app.config['GREMLIN_WRITE_TIMEOUT_MS'],
-            wire=message_serializer(app.config['GREMLIN_SERIALIZER']),
-        )
-        app.config['GROOVY_LOADED'] = True
-        app.logger.info('Loaded server-side Groovy helpers.')
-    except (GroovyInjectionError, OSError) as exc:
-        # Degraded, not dead: /health stays green so the process is not respawn-looped,
-        # /ready reports 503 so no traffic is routed here.
-        app.logger.error(
-            'Could not load server-side Groovy helpers (%s). Relationship endpoints will '
-            'fail until Gremlin Server is reachable and the script is loaded.', exc,
-        )
 
 
 def _register_web(app):
@@ -251,17 +186,15 @@ def create_app(configuration=General_Configuration):
 
     _configure_logging(app)
     _ensure_directories(app)
+    db.init_app(app)
     _register_error_handlers(app)
     _register_cors(app)
     _register_auth(app)
     _register_health(app)
     _register_web(app)
 
+    from Tree.api.routes import api
     app.register_blueprint(api)
-    app.register_blueprint(base)
-    app.register_blueprint(people)
-    app.register_blueprint(relations)
-    app.register_blueprint(locations)
 
     # The face feature depends on dlib, which is a source-only build. Registering it
     # conditionally is what lets the core application install and run in one command.
@@ -274,5 +207,4 @@ def create_app(configuration=General_Configuration):
     else:
         app.register_blueprint(faces)
 
-    _load_groovy(app)
     return app

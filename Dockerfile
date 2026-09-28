@@ -21,13 +21,14 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY Tree ./Tree
-COPY functions.groovy schema.groovy wsgi.py TreeServer.py ./
+COPY wsgi.py TreeServer.py ./
 # The interface built in the stage above, served same-origin at the application root.
 COPY --from=web /web/dist ./web/dist
 
-# Uploads and the face store live on a volume, never inside the source tree. The original wrote
-# them into Tree/faces/ and deleted that directory's contents at import time.
-ENV FAMILYTREE_DATA_DIR=/data
+# The SQLite database and the media/upload store live on a volume, never inside the source
+# tree. The database file is FAMILYTREE_DB_PATH; everything else hangs off FAMILYTREE_DATA_DIR.
+ENV FAMILYTREE_DATA_DIR=/data \
+    FAMILYTREE_DB_PATH=/data/family.sqlite
 RUN mkdir -p /data && useradd --create-home --uid 10001 app && chown -R app:app /app /data
 USER app
 VOLUME ["/data"]

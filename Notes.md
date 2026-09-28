@@ -1,5 +1,32 @@
 # Family Tree
 
+## Storage
+
+The tree is stored in a single **SQLite** file. It began on JanusGraph/Gremlin — a graph
+database reached over a Gremlin websocket, with relationships as gendered edge labels and a set
+of server-side Groovy helpers — and was cut over to SQLite because a family tree is small,
+single-writer, and worth nothing if it cannot be backed up by copying a file. The SQLite store
+in `Tree/storage/` mirrors the exact function surface the kinship engine and the API already
+spoke to (`load_family_graph`, the person and link writers, the vocabulary readers), so the
+swap changed the backend without changing the engine, the routes, or any `/api/v1/*` response
+shape.
+
+What this means in practice:
+
+* **One file is one tree.** `FAMILYTREE_DB_PATH` points at it; opening it applies the schema
+  idempotently and is a no-op on an existing file. Back the tree up by copying that file (plus
+  any `-wal`/`-shm` siblings) or the whole `FAMILYTREE_DATA_DIR` folder.
+* **A connection per request**, opened lazily on `flask.g` and closed on teardown — there is no
+  module-level database object, so importing the package touches nothing and each test gets its
+  own file (`Tree/db.py`).
+* **Roles are stored directly.** A `parent_link` row carries its role (`biological` /
+  `adoptive`), so the gendered-edge translation the graph store did at its boundary is gone;
+  a birth order is an `elder_id` on a pair, never an invented date.
+* **JanusGraph, Gremlin and the Groovy helpers are removed** — no `gremlinpython` dependency,
+  no `functions.groovy`/`schema.groovy`, no `docker-compose.yml`, and no server to run beside
+  the API. The 2021 blueprints (`/get/person`, `/add/person`, `/query/*`, the `/spoc` reseed
+  routes) went with them; the interface uses only `/api/v1/*`.
+
 ## Logical Section
 
 In this section, I will be stating the reasoning used to justify the code behaviour.

@@ -20,8 +20,9 @@ import numpy as np
 from flask import current_app
 from PIL import Image, ImageDraw, ImageFont
 
-from Tree import g
+from Tree.db import get_db
 from Tree.faces import encoding_store
+from Tree.storage import get_person
 
 log = logging.getLogger(__name__)
 
@@ -96,25 +97,22 @@ def recognize_encoding(encoding):
 
 
 def _person_label(vertex_id, relatives_dictionary):
-    """The caption for a recognised face."""
+    """The caption for a recognised face.
+
+    Reads the person's name from the SQLite store. When a relation map is supplied, the caption
+    is the relation label rather than the name (the recognise/relate flow), matching the graph
+    version; the store has no nickname column, so the relation label stands alone.
+    """
+    person = get_person(get_db(), vertex_id)
+
     if relatives_dictionary is None:
-        first = g.V(vertex_id).values('Firstname')
-        last = g.V(vertex_id).values('Lastname')
-        parts = []
-        if first.hasNext():
-            parts.append(str(first.next()))
-        if last.hasNext():
-            parts.append(str(last.next()))
-        return ' '.join(parts)
+        return person.full_name if person is not None else ''
 
     if vertex_id not in relatives_dictionary:
         return ''
     relation = relatives_dictionary[vertex_id]
     if relation is None:
         return ''
-    nickname = g.V(vertex_id).values('Nickname')
-    if nickname.hasNext():
-        return f'{nickname.next()}-{relation}'
     return str(relation)
 
 
