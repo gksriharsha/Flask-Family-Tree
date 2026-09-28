@@ -1,4 +1,4 @@
-import type { GraphResponse, PersonNode, Side, TreeInfo } from './api';
+import type { GraphResponse, ParentLink, PersonNode, Side, TreeInfo } from './api';
 import type { PersonDraft } from './views/personform';
 
 export type Lang = 'en' | 'te' | 'both';
@@ -14,6 +14,10 @@ export interface AppState {
   loading: boolean;
   error: string | null;
   root: number | null;
+  /** The generation radius of the window currently loaded around `root`. 0 = not windowed. */
+  windowGenerations: number;
+  /** True while a widen/re-anchor window fetch is in flight, so it is not issued twice. */
+  expanding: boolean;
   selected: number | null;
   side: Side;
   lang: Lang;
@@ -41,6 +45,8 @@ export const state: AppState = {
   loading: false,
   error: null,
   root: null,
+  windowGenerations: 0,
+  expanding: false,
   selected: null,
   side: 'paternal',
   lang: 'both',
@@ -130,6 +136,51 @@ export function buildIndex(graph: GraphResponse): GraphIndex {
 export function setGraph(graph: GraphResponse | null): void {
   state.graph = graph;
   index = graph ? buildIndex(graph) : EMPTY_INDEX;
+}
+
+/**
+ * Merge a windowed payload into the accumulated graph, then rebuild the index once.
+ *
+ * The tree view loads a window around the root and, as the reader pans or expands toward the
+ * window's edge, fetches a wider or re-anchored window and folds it in here rather than
+ * throwing the loaded people away and starting over. People are unioned by id, parent links
+ * by (child,parent), unions by unordered pair. The incoming copy of a person WINS, because a
+ * fresh payload carries that person's relationships recomputed from the current root — so a
+ * re-anchor (new root) correctly relabels everyone the new window covers while people outside
+ * it keep the labels they last had. `Counts`/`Window`/`Root` are taken from the incoming
+ * payload, which describes the latest read.
+ *
+ * A no-op safe default: merging into a null accumulator just sets it.
+ */
+export function mergeGraph(incoming: GraphResponse): void {
+  const base = state.graph;
+  if (base === null) {
+    setGraph(incoming);
+    return;
+  }
+
+  const peopleById = new Map<number, PersonNode>();
+  for (const p of base.People) peopleById.set(p.id, p);
+  for (const p of incoming.People) peopleById.set(p.id, p); // incoming wins (fresh labels)
+
+  const linkKey = (l: ParentLink) => `${l.child}:${l.parent}`;
+  const linksByKey = new Map<string, ParentLink>();
+  for (const l of base.ParentLinks) linksByKey.set(linkKey(l), l);
+  for (const l of incoming.ParentLinks) linksByKey.set(linkKey(l), l);
+
+  const unionKey = (u: { a: number; b: number }) =>
+    u.a <= u.b ? `${u.a}:${u.b}` : `${u.b}:${u.a}`;
+  const unionsByKey = new Map<string, { a: number; b: number }>();
+  for (const u of base.Unions) unionsByKey.set(unionKey(u), u);
+  for (const u of incoming.Unions) unionsByKey.set(unionKey(u), u);
+
+  const merged: GraphResponse = {
+    ...incoming,
+    People: [...peopleById.values()],
+    ParentLinks: [...linksByKey.values()],
+    Unions: [...unionsByKey.values()],
+  };
+  setGraph(merged);
 }
 
 /** The live index, for modules (layout) that want to walk it directly. */

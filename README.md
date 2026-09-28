@@ -67,8 +67,32 @@ and the defaults.
 | `FAMILYTREE_DATA_DIR` | `./data` | Uploads, media and the face store. Never inside the source tree. |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:4200` | Comma-separated exact origins. Not a wildcard. |
 | `MAX_UPLOAD_BYTES` | `10485760` | Requests above this get a 413. |
-| `MAX_GRAPH_PEOPLE` | `100000` | Ceiling on the whole-tree read. |
+| `MAX_GRAPH_PEOPLE` | `100000` | Ceiling on the whole-tree read (`GET /graph` with no `around`). Past this the read returns the first `MAX_GRAPH_PEOPLE` by id with `Counts.truncated=true`, never a 500. |
+| `GRAPH_DEFAULT_GENERATIONS` | `3` | Default hop radius of the windowed `GET /graph?around=`. |
+| `GRAPH_MAX_GENERATIONS` | `6` | Ceiling on that radius; larger `generations` is clamped to it. |
+| `MAX_PAGE_SIZE` | `200` | Ceiling on the `GET /people` page size; larger `limit` is clamped. |
 | `GEOCODING_ENABLED` | `0` | Off by default; a location is created without coordinates. |
+
+## Read API
+
+The read endpoints are windowed and paginated so the app stays fast at 5,000–10,000 people:
+labelling every person against the root on every request is O(N) and does not scale, so the
+tree view loads a *window* around one person and the list surfaces page through people a
+screenful at a time. Every response preserves the keys it always had; this pivot only **adds**
+keys.
+
+| Endpoint | What it returns |
+| --- | --- |
+| `GET /api/v1/graph?around=<id>&generations=<n>` | Only the people within `n` parent/child hops of `around` (default `n` = `GRAPH_DEFAULT_GENERATIONS`, max `GRAPH_MAX_GENERATIONS`), plus their spouses and the `ParentLinks`/`Unions` among the included people. Relationship labels are computed from `root` (default = `around`); `root` must be inside the window. Adds `Window: {around, generations}`. |
+| `GET /api/v1/graph` | The whole tree, as before — the client still depends on it. Capped at `MAX_GRAPH_PEOPLE`: past the cap it returns the first `MAX_GRAPH_PEOPLE` by id with `Counts.truncated=true`, never a 500. |
+| `GET /api/v1/people?cursor=<opaque>&limit=<n>&q=<prefix>` | One keyset page of people, ordered by `(given, surname, id)`. `{People, NextCursor, Total}`; `NextCursor` is null on the last page. `limit` is capped by `MAX_PAGE_SIZE`; `cursor` is an opaque base64 of the keyset (garbage → 400); `q` filters by name prefix. |
+| `GET /api/v1/search?q=<prefix>` | Typeahead across both scripts. Prefix-matched on given/surname so it is served by the `NOCASE` name indexes rather than a full scan. Response shape unchanged. |
+
+Every `/graph` response now also carries `Counts.truncated` (bool) and `Counts.totalPeople`
+(int, the whole tree's size regardless of how many this payload holds), so the client can show
+a "N of M people loaded" indicator and know when a window is a subset. The window walk is done
+in SQL with a recursive CTE over `parent_link`; the client merges successive windows into its
+Map-indexed state as the reader pans toward the edge, rather than reloading the whole tree.
 
 ## Managing the tree — `python -m Tree.cli`
 

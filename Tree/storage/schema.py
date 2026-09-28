@@ -25,7 +25,7 @@ import sqlite3
 log = logging.getLogger(__name__)
 
 #: Bump when the schema changes and add a migration step in :func:`_migrate`.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 #: v1 builds everything. Every statement is idempotent (``IF NOT EXISTS``) so re-applying it
 #: to an already-current database changes nothing.
@@ -122,6 +122,15 @@ CREATE TABLE IF NOT EXISTS photo (
 CREATE INDEX IF NOT EXISTS ix_photo_person ON photo(person_id);
 """
 
+#: v3 adds a composite index that backs cursor pagination on /api/v1/people. The keyset scan
+#: orders by (given, surname, id) and seeks past a cursor with a tuple comparison; a composite
+#: index on exactly those columns, in the default BINARY collation the ORDER BY uses, lets
+#: SQLite serve the ordered page straight from the index with no temp-B-tree sort. Idempotent,
+#: so re-applying is a no-op.
+_SCHEMA_V3 = """
+CREATE INDEX IF NOT EXISTS ix_person_page ON person(given, surname, id);
+"""
+
 
 def open_database(path: str) -> sqlite3.Connection:
     """Open (or create) a family-tree database, with the schema applied.
@@ -159,5 +168,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if version < 2:
             conn.executescript(_SCHEMA_V2)
             conn.execute('INSERT INTO schema_version(version) VALUES (2)')
-        # Future migrations: `if version < 3: ...; conn.execute('INSERT ... VALUES (3)')`.
+        if version < 3:
+            conn.executescript(_SCHEMA_V3)
+            conn.execute('INSERT INTO schema_version(version) VALUES (3)')
+        # Future migrations: `if version < 4: ...; conn.execute('INSERT ... VALUES (4)')`.
     log.info('Applied schema up to version %d', SCHEMA_VERSION)

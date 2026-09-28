@@ -77,7 +77,20 @@ class Configuration:
     # How many people the whole-tree read (/api/v1/graph) loads. A family tree is small, so the
     # ceiling is high; it exists only so a pathological database cannot ask the process to build
     # an unbounded structure in memory. The four bulk SELECTs behind it stay fast well past this.
+    # The uncapped /graph (no ?around=) now stops at this many people by id and reports
+    # Counts.truncated=true rather than building an unbounded payload — see Tree.api.reads.
     MAX_GRAPH_PEOPLE = _env_int('MAX_GRAPH_PEOPLE', 100000)
+
+    # --- Windowed read API ---------------------------------------------------
+    # The windowed /graph?around= walks this many parent/child hops out from the anchor by
+    # default, and refuses to walk more than the max. Six generations reaches great-great-great
+    # grandparents/-children, which is as much as a single screen can usefully show; the walk is
+    # bounded so an attacker cannot ask for the whole tree by passing a huge number.
+    GRAPH_DEFAULT_GENERATIONS = _env_int('GRAPH_DEFAULT_GENERATIONS', 3)
+    GRAPH_MAX_GENERATIONS = _env_int('GRAPH_MAX_GENERATIONS', 6)
+    # Cursor-paginated /people caps the page size. A caller may ask for fewer; a request for
+    # more is clamped to this, so one request can never pull the whole tree.
+    MAX_PAGE_SIZE = _env_int('MAX_PAGE_SIZE', 200)
 
     # --- Geocoding ------------------------------------------------------------
     # Off by default. Coordinate lookup used to happen inline inside POST /add/location by

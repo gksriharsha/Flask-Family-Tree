@@ -2,9 +2,11 @@ import './styles.css';
 import { ApiError, api, loadToken, setToken } from './api';
 import { escapeHtml as escape } from './dom';
 import {
+  childrenOf,
   focusId,
   graphIndex,
   lineageSpine,
+  mergeGraph,
   person,
   setGraph,
   state,
@@ -20,6 +22,13 @@ import { renderCanvasNode, renderTree } from './views/tree';
 
 const root = document.getElementById('app')!;
 
+/**
+ * How many parent/child hops the tree view loads around the current root on a fresh load, and
+ * how far each expansion widens the window. Kept to the server's default; the server clamps to
+ * its own maximum, so asking for more here is harmless.
+ */
+const DEFAULT_GENERATIONS = 3;
+
 /* ── data ──────────────────────────────────────────────────────────────────── */
 async function reload(): Promise<void> {
   state.loading = true;
@@ -34,9 +43,31 @@ async function reload(): Promise<void> {
       render();
       return;
     }
-    const graph = await api.graph(state.root, state.side);
-    setGraph(graph); // rebuilds the Map-based indexes once per load
+
+    // The tree view loads a WINDOW around the root, not the whole tree — that is what keeps a
+    // 10k-person tree opening on the few dozen people in view. When we do not yet have a root
+    // (first load, or the previous root was deleted), discover the lowest-id person from the
+    // paginated list and anchor the window there.
+    let anchor = state.root;
+    if (anchor === null) {
+      const firstPage = await api.people(null, 1);
+      if (firstPage.People.length === 0) {
+        setGraph(null); // empty tree
+        state.root = null;
+        state.loading = false;
+        render();
+        return;
+      }
+      anchor = firstPage.People[0]!.id;
+    }
+
+    const graph = await api.graphAround(anchor, DEFAULT_GENERATIONS, state.side);
+    setGraph(graph); // rebuilds the Map-based indexes once per load; a fresh root replaces
     state.root = graph.Root;
+    state.windowGenerations = graph.Window?.generations ?? DEFAULT_GENERATIONS;
+    // A fresh root means a fresh window: let the frontier auto-widen fire again.
+    atWindowCap = false;
+    lastEdgeFocus = null;
     if (state.selected === null || !person(state.selected)) {
       state.selected = graph.Root;
     }
@@ -53,6 +84,66 @@ async function reload(): Promise<void> {
   } finally {
     state.loading = false;
     render();
+  }
+}
+
+/**
+ * Widen the window around the current root by one step and merge the result in.
+ *
+ * Called when the reader reaches the edge of what is loaded — descending into a person with no
+ * loaded children, or panning the canvas past the mounted set — so the tree keeps filling in
+ * without ever loading all N people at once. Widening (rather than re-anchoring on a foreign
+ * id) always keeps the root inside its own window, so the server never has to reject the read,
+ * and the loaded region grows outward from the reader's own line. Idempotent while a fetch is
+ * in flight (guarded by `state.expanding`) and a no-op once the window reaches the server's
+ * maximum depth (a widen that comes back the same generations means we are already at the cap).
+ */
+async function expandWindow(): Promise<void> {
+  if (state.root === null || state.expanding) return;
+  const next = state.windowGenerations + DEFAULT_GENERATIONS;
+  state.expanding = true;
+  try {
+    const graph = await api.graphAround(state.root, next, state.side);
+    const before = state.windowGenerations;
+    mergeGraph(graph);
+    state.windowGenerations = graph.Window?.generations ?? next;
+    layoutCache = null; // the merged graph changes the layout; let it recompute
+    // If the server clamped us to the same depth we already had, we are at the cap: stop
+    // asking. `atWindowCap` short-circuits the render-time trigger below.
+    atWindowCap = state.windowGenerations <= before;
+  } catch {
+    /* a failed widen leaves the reader on what is already loaded rather than erroring out */
+  } finally {
+    state.expanding = false;
+    render();
+  }
+}
+
+/** True once widening stops revealing new depth — the loaded window covers the whole tree. */
+let atWindowCap = false;
+/** The focus id the last auto-widen was triggered for, so a single edge does not loop. */
+let lastEdgeFocus: number | null = null;
+
+/**
+ * When the reader has moved to the edge of the loaded window, widen it in the background.
+ *
+ * The edge is a focused/selected person who exists in the loaded graph but sits at its
+ * frontier — a person with no loaded children who is not known to be a genuine leaf. Widening
+ * around the root reveals their real neighbours if there are any; if there are none the widen
+ * is cheap and idempotent, and `atWindowCap`/`lastEdgeFocus` stop it from firing again for the
+ * same spot. Read-only side effects only: it never blocks a render.
+ */
+function maybeExpandForFocus(): void {
+  if (atWindowCap || state.expanding || state.root === null) return;
+  const id = state.focus ?? state.selected;
+  if (id === null || id === lastEdgeFocus) return;
+  const p = person(id);
+  if (!p) return;
+  // A frontier person: loaded, but with no loaded children — widening may reveal descendants
+  // the current window stopped short of. (A true leaf simply yields no new people.)
+  if (childrenOf(id).length === 0) {
+    lastEdgeFocus = id;
+    void expandWindow();
   }
 }
 
@@ -136,7 +227,7 @@ function leftRail(): string {
         <p class="lbl">Kinship measured from</p>
         <div class="rootcard">
           <div class="nm">${escape(rootPerson?.name ?? '—')}</div>
-          <div class="sub">${counts ? `${counts.people} people · ${counts.unions} unions` : ''}</div>
+          <div class="sub">${state.graph ? loadedSummary() : ''}</div>
         </div>
       </div>
 
@@ -208,6 +299,22 @@ function leftRail(): string {
     </div>`;
 }
 
+/**
+ * The header count. When the whole tree is loaded it reads "N people · U unions" as before;
+ * while a window is loaded and more of the tree exists off-screen it reads "N of M people
+ * loaded", so the reader knows the view is a window and that panning fetches more. The loaded
+ * count is the ACCUMULATED people in the merged graph (which grows as windows fold in), not
+ * the last payload's own count; the total comes from Counts.totalPeople.
+ */
+function loadedSummary(): string {
+  const g = state.graph;
+  if (!g) return '';
+  const loaded = g.People.length;
+  const total = g.Counts.totalPeople;
+  if (loaded < total) return `${loaded} of ${total} people loaded`;
+  return `${loaded} people · ${g.Unions.length} unions`;
+}
+
 function topBar(): string {
   const shown = state.searchResults.slice(0, SEARCH_SHOWN);
   const more = state.searchResults.length > SEARCH_SHOWN;
@@ -245,9 +352,7 @@ function topBar(): string {
         <button data-lang="both" aria-pressed="${state.lang === 'both'}">Both</button>
       </div>
       <span class="spacer"></span>
-      <span class="counts">${
-        state.graph ? `${state.graph.Counts.people} people · ${state.graph.Counts.unions} unions` : ''
-      }</span>
+      <span class="counts">${loadedSummary()}</span>
     </header>`;
 }
 
@@ -333,6 +438,11 @@ function render(): void {
     const first = root.querySelector<HTMLInputElement>('.sheet [data-df="given"]');
     if (first && document.activeElement === document.body) first.focus();
   }
+
+  // If the reader has reached the edge of the loaded window, widen it in the background. This
+  // runs AFTER the DOM is in place so the current view paints immediately from what is loaded;
+  // the widen, when it lands, re-renders with the newly-arrived people merged in.
+  maybeExpandForFocus();
 }
 
 /* ── events ────────────────────────────────────────────────────────────────── */

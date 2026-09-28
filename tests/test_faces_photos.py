@@ -29,7 +29,9 @@ def conn(tmp_path):
 
 def test_schema_is_at_version_two_with_the_new_shape(conn):
     version = conn.execute('SELECT MAX(version) AS v FROM schema_version').fetchone()['v']
-    assert version == 2
+    # The photos/places shape lands at v2; later additive migrations (e.g. the windowed-API
+    # pagination index at v3) only raise the version, so assert >= rather than ==.
+    assert version >= 2
     columns = {row['name'] for row in conn.execute('PRAGMA table_info(person)')}
     assert {'birth_place', 'death_place'} <= columns
     tables = {row['name'] for row in
@@ -55,7 +57,7 @@ def test_migration_from_v1_adds_the_columns_in_place(tmp_path):
 
     upgraded = open_database(path)
     version = upgraded.execute('SELECT MAX(version) AS v FROM schema_version').fetchone()['v']
-    assert version == 2
+    assert version >= 2
     # the pre-existing person is untouched, and now has NULL places
     row = upgraded.execute('SELECT given, birth_place FROM person').fetchone()
     assert row['given'] == 'Existing'
