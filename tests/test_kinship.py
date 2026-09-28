@@ -7,14 +7,14 @@ the struct layer shows up here rather than as a wrong word in front of a relativ
 
 import pytest
 
+# The family these tests are built on lives in a shared fixture, so the SQLite-store tests can
+# reproduce the identical family through the store's write functions. build() returns exactly
+# the graph this suite used inline, so every assertion below is unchanged.
+from tests.family_fixture import build
 from Tree.kinship import (
-    ADOPTIVE,
     FEMALE,
     MALE,
     FamilyGraph,
-    ParentLink,
-    Person,
-    Union,
     Vocabulary,
     closest,
     explain,
@@ -25,53 +25,6 @@ from Tree.kinship import (
 )
 from Tree.kinship.model import UNKNOWN, Kinship
 from Tree.kinship.vocabulary import MATERNAL
-
-
-# ── a family with the shapes that actually occur ────────────────────────────────
-#  · a within-family adoption, so two people are related more than one way
-#  · uncles with and without recorded birth years
-#  · both parallel and cross cousins
-def build() -> FamilyGraph:
-    g = FamilyGraph()
-    people = [
-        # id, given, sex, birth year
-        (1, 'Aditya Varun', MALE, 1990), (2, 'Bharath Kiran', MALE, 1993),
-        (3, 'Chandra Mohan', MALE, 1958), (4, 'Deepa Latha', FEMALE, 1962),
-        (5, 'Eshwar Datta', MALE, 1928), (6, 'Girija', FEMALE, 1932),
-        (8, 'Parent1', MALE, 1901), (9, 'Parent2', FEMALE, 1905),
-        (7, 'Harinath', MALE, None),          # no recorded birth year
-        (10, 'Kalyani Naidu', FEMALE, 1959),
-        (11, 'Lokesh', MALE, 1991), (29, 'Manoj', MALE, 1995),
-        (12, 'Madhava', MALE, None),           # no recorded birth year
-        (13, 'Nirmala', FEMALE, 1957),
-        (14, 'Padmini', FEMALE, 1984), (15, 'Raghava', MALE, 1987),
-        (20, 'Yeshwanth', MALE, 1964), (21, 'Bhavani', FEMALE, 1966),
-        (22, 'Chandana Sri', FEMALE, 1992),
-        (23, 'Dinesh', MALE, 1957), (24, 'Gowri', FEMALE, 1961),
-        (25, 'Hema', FEMALE, 1986), (26, 'Indira', FEMALE, 1989),
-    ]
-    for pid, given, sex, born in people:
-        g.add_person(Person(id=pid, given=given, surname='Varma', sex=sex, birth_year=born))
-
-    links = [
-        (1, 3), (1, 4), (2, 3), (2, 4),
-        (6, 8), (6, 9),
-        (3, 5), (3, 6), (12, 5), (12, 6), (24, 5), (24, 6), (20, 5), (20, 6),
-        (7, 5), (7, 6),
-        (11, 7), (11, 10), (29, 7), (29, 10),
-        (14, 12), (14, 13), (15, 12), (15, 13),
-        (25, 23), (25, 24), (26, 23), (26, 24),
-        (22, 20), (22, 21),
-    ]
-    for child, parent in links:
-        g.add_parent_link(ParentLink(child_id=child, parent_id=parent))
-    # the within-family adoption: born to 5+6, adopted by Girija's own parents
-    g.add_parent_link(ParentLink(child_id=7, parent_id=8, role=ADOPTIVE))
-    g.add_parent_link(ParentLink(child_id=7, parent_id=9, role=ADOPTIVE))
-
-    for a, b in [(3, 4), (5, 6), (7, 10), (12, 13), (23, 24), (20, 21), (8, 9)]:
-        g.add_union(Union(a_id=a, b_id=b))
-    return g
 
 
 @pytest.fixture()
