@@ -10,13 +10,11 @@ and friends; keep them importable here. Request validation and JSON shaping live
 import logging
 from pathlib import Path
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, request
 
 from Tree.api.helpers import (
     ROLES,
-    link_json,
     link_request,
-    person_json,
     person_payload,
     side_arg,
 )
@@ -34,8 +32,7 @@ from Tree.gedcom.store import (
     load_settings,
     read_gedcom_text,
 )
-from Tree.kinship import relationships, unresolved_seniority
-from Tree.kinship.model import BIOLOGICAL, FEMALE, MALE
+from Tree.kinship.model import BIOLOGICAL
 from Tree.kinship.vocabulary import MATERNAL, PATERNAL
 from Tree.storage import (
     add_word,
@@ -43,12 +40,10 @@ from Tree.storage import (
     delete_person,
     link_parent,
     link_union,
-    load_family_graph,
     load_vocabulary,
     person_exists,
     pin_term,
     record_birth_order,
-    search_people,
     unlink_parent,
     unlink_union,
     unpin_term,
@@ -178,95 +173,6 @@ def session():
     return ok('Signed in')
 
 
-@api.route('/graph', methods=['GET'])
-def graph_view():
-    """Everything the tree needs, labelled from one person's point of view.
-
-    ``?root=`` chooses whose relationships are described; ``?side=`` chooses which branch of
-    the family's vocabulary to speak in. Neither changes any stored data.
-    """
-    conn = get_db()
-    family = load_family_graph(conn, limit=current_app.config['MAX_GRAPH_PEOPLE'])
-    if not family.people:
-        return ok('Tree is empty', People=[], ParentLinks=[], Unions=[],
-                  Root=None, Side=side_arg())
-
-    side = side_arg()
-    root_param = request.args.get('root')
-    root = as_vertex_id(root_param, field='root') if root_param else min(family.people)
-    if root not in family.people:
-        raise ApiError('No such person.', status=404)
-
-    vocab = load_vocabulary(conn, side=side)
-
-    people = []
-    open_questions = 0
-    for person in sorted(family.people.values(), key=lambda p: p.id):
-        links = relationships(family, root, person.id)
-        pair = unresolved_seniority(links)
-        if pair:
-            open_questions += 1
-        people.append({
-            **person_json(person),
-            'relationships': [
-                link_json(k, vocab, person.id, show_via=len(links) > 1) for k in links
-            ],
-            'seniorityQuestion': (
-                {'a': pair[0], 'b': pair[1],
-                 'aName': family.people[pair[0]].full_name,
-                 'bName': family.people[pair[1]].full_name}
-                if pair else None
-            ),
-        })
-
-    parent_links = [
-        {'child': child_id, 'parent': link.parent_id, 'role': link.role}
-        for child_id, links in family.parents.items() for link in links
-    ]
-
-    return ok(
-        'Tree loaded',
-        Root=root, Side=side,
-        People=people,
-        ParentLinks=parent_links,
-        Unions=[{'a': u.a_id, 'b': u.b_id} for u in family.unions],
-        Counts={
-            'people': len(family.people),
-            'unions': len(family.unions),
-            'openBirthOrderQuestions': open_questions,
-        },
-    )
-
-
-@api.route('/people/<int:subject>/relationship-to/<int:other>', methods=['GET'])
-def relationship(subject: int, other: int):
-    """Every genuine relationship between two people, not only the closest."""
-    conn = get_db()
-    family = load_family_graph(conn, limit=current_app.config['MAX_GRAPH_PEOPLE'])
-    for person_id in (subject, other):
-        if person_id not in family.people:
-            raise ApiError('No such person.', status=404)
-
-    side = side_arg()
-    vocab = load_vocabulary(conn, side=side)
-    links = relationships(family, subject, other)
-    pair = unresolved_seniority(links)
-
-    return ok(
-        'Relationship found',
-        Subject=person_json(family.people[subject]),
-        Other=person_json(family.people[other]),
-        Side=side,
-        Relationships=[link_json(k, vocab, other, show_via=len(links) > 1) for k in links],
-        SeniorityQuestion=(
-            {'a': pair[0], 'b': pair[1],
-             'aName': family.people[pair[0]].full_name,
-             'bName': family.people[pair[1]].full_name}
-            if pair else None
-        ),
-    )
-
-
 @api.route('/birth-order', methods=['POST'])
 def set_birth_order():
     """Record which of two people was born first.
@@ -353,31 +259,6 @@ def delete_pin(person_id: int):
     unpin_term(get_db(), person_id, str(body['base_term']).strip())
     _refresh_files()
     return ok('Pin removed', Person=person_id)
-
-
-@api.route('/search', methods=['GET'])
-def search():
-    """Typeahead across both scripts."""
-    query = (request.args.get('q') or '').strip()
-    limit = min(int(request.args.get('limit') or 20),
-                current_app.config['MAX_SEARCH_RESULTS'])
-    if not query:
-        return ok('People found', Data=[])
-
-    people = search_people(get_db(), query, limit=limit)
-    # The historical shape: an element-map-style dict per person carrying the graph property
-    # names and the id re-exposed as ``ID``. Built here from the store's Person objects rather
-    # than a Gremlin elementMap, so the client sees exactly what it did before.
-    data = []
-    for person in people:
-        row = {'ID': person.id, 'Firstname': person.given}
-        if person.surname:
-            row['Lastname'] = person.surname
-        gender = {MALE: 'Male', FEMALE: 'Female'}.get(person.sex)
-        if gender:
-            row['Gender'] = gender
-        data.append(row)
-    return ok('People found', Data=data)
 
 
 # ── people ──────────────────────────────────────────────────────────────────────
@@ -496,3 +377,10 @@ def delete_link():
         raise ApiError(str(exc)) from exc
     _refresh_files()
     return ok('Link removed', Link={'type': kind, **args})
+
+
+# The read handlers (/graph, /search, /people/<a>/relationship-to/<b>, GET /people) live in
+# Tree.api.reads and register themselves on the ``api`` blueprint above. Importing the module
+# here — after ``api`` exists — is what runs their route decorators; it is a deliberate
+# bottom-of-file import to avoid a cycle (reads imports ``api`` from this module).
+from Tree.api import reads as _reads  # noqa: E402,F401

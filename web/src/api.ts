@@ -100,7 +100,27 @@ export interface GraphResponse {
   People: PersonNode[];
   ParentLinks: ParentLink[];
   Unions: { a: number; b: number }[];
-  Counts: { people: number; unions: number; openBirthOrderQuestions: number };
+  /** Present on a windowed read (?around=); null on a full read. */
+  Window: { around: number; generations: number } | null;
+  Counts: {
+    people: number;
+    unions: number;
+    openBirthOrderQuestions: number;
+    /** True when the payload is a subset of the tree (a full read past MAX_GRAPH_PEOPLE). */
+    truncated: boolean;
+    /** How many people the whole tree holds, regardless of how many this payload carries. */
+    totalPeople: number;
+  };
+}
+
+/** A person as the list surfaces receive them: person_json without computed relationships. */
+export type ListPerson = Omit<PersonNode, 'relationships' | 'seniorityQuestion'>;
+
+/** One page of the cursor-paginated /people list. `NextCursor` is null on the last page. */
+export interface PeoplePage {
+  People: ListPerson[];
+  NextCursor: string | null;
+  Total: number;
 }
 
 export class ApiError extends Error {
@@ -196,6 +216,35 @@ export const api = {
     const params = new URLSearchParams({ side });
     if (root !== null) params.set('root', String(root));
     return request<GraphResponse>(`/api/v1/graph?${params}`);
+  },
+
+  /**
+   * A window of the tree around one person, labelled from `root` (default: `around`).
+   *
+   * Returns only the people within `generations` parent/child hops of `around`, plus their
+   * spouses and the links among the included people. This is what the tree view loads instead
+   * of the whole tree, so a 10k-person tree opens on the ~dozens of people in view rather than
+   * labelling all N up front. Panning/expanding toward the window edge fetches a wider or
+   * re-anchored window and merges it into the Map-indexed state.
+   */
+  graphAround: (around: number, generations: number, side: Side, root?: number) => {
+    const params = new URLSearchParams({ side, around: String(around),
+                                         generations: String(generations) });
+    if (root !== undefined) params.set('root', String(root));
+    return request<GraphResponse>(`/api/v1/graph?${params}`);
+  },
+
+  /**
+   * One keyset page of people for the list surfaces (the "view all" list, pickers).
+   *
+   * Cursor pagination: pass the previous page's `NextCursor` to continue, `null`/omit to start.
+   * `q` restricts to a name prefix. `limit` is capped server-side by MAX_PAGE_SIZE.
+   */
+  people: (cursor: string | null, limit: number, q?: string) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.set('cursor', cursor);
+    if (q) params.set('q', q);
+    return request<PeoplePage>(`/api/v1/people?${params}`);
   },
 
   search: (q: string) =>

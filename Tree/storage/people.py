@@ -71,36 +71,33 @@ def _living_bool(value: object) -> bool | None:
     return bool(value)
 
 
-# ── reading the whole tree ──────────────────────────────────────────────────────
-def load_family_graph(conn: sqlite3.Connection, limit: int = 5000) -> FamilyGraph:
-    """Load the whole tree in four bulk queries.
+def _person_from_row(row: sqlite3.Row) -> Person:
+    """Build a :class:`Person` from a ``person`` row selecting the standard seven columns.
 
-    Loading everything at family scale keeps the query count constant regardless of how many
-    people are shown, exactly as the graph store does. ``limit`` bounds the people read; the
-    link tables are then filtered to the loaded set in memory so a truncated read never
-    references a person it did not load.
+    One place to turn a row into a Person, shared by every read (whole-tree load, windowed
+    load, single-person get, search, paginated page) so the mapping cannot drift between them.
     """
-    graph = FamilyGraph()
+    return Person(
+        id=row['id'],
+        given=str(row['given'] or ''),
+        surname=str(row['surname'] or ''),
+        sex=_sex(row['sex']),
+        birth=DateValue.parse(row['birth']),
+        death=DateValue.parse(row['death']),
+        birth_year=_year(row['birth']),
+        death_year=_year(row['death']),
+        living=_living_bool(row['living']),
+    )
 
-    for row in conn.execute(
-        'SELECT id, given, surname, sex, birth, death, living FROM person '
-        'ORDER BY id LIMIT ?',
-        (limit,),
-    ):
-        graph.add_person(Person(
-            id=row['id'],
-            given=str(row['given'] or ''),
-            surname=str(row['surname'] or ''),
-            sex=_sex(row['sex']),
-            birth=DateValue.parse(row['birth']),
-            death=DateValue.parse(row['death']),
-            birth_year=_year(row['birth']),
-            death_year=_year(row['death']),
-            living=_living_bool(row['living']),
-        ))
 
+def _load_relationships_into(conn: sqlite3.Connection, graph: FamilyGraph) -> None:
+    """Add every parent link, union and birth-order answer whose endpoints are already loaded.
+
+    Shared by :func:`load_family_graph` and :func:`Tree.storage.reads.load_windowed_graph`: both
+    load a set of people first, then filter the link tables to that set in memory so no link
+    references a person that was not loaded. Factored out so the two readers cannot drift.
+    """
     people = graph.people
-
     for row in conn.execute('SELECT child_id, parent_id, role FROM parent_link'):
         if row['child_id'] in people and row['parent_id'] in people:
             graph.add_parent_link(ParentLink(
@@ -119,10 +116,37 @@ def load_family_graph(conn: sqlite3.Connection, limit: int = 5000) -> FamilyGrap
         if elder in people and younger in people:
             graph.record_birth_order(elder_id=elder, younger_id=younger)
 
+
+# ── reading the whole tree ──────────────────────────────────────────────────────
+def load_family_graph(conn: sqlite3.Connection, limit: int = 5000) -> FamilyGraph:
+    """Load the whole tree in four bulk queries.
+
+    Loading everything at family scale keeps the query count constant regardless of how many
+    people are shown, exactly as the graph store does. ``limit`` bounds the people read; the
+    link tables are then filtered to the loaded set in memory so a truncated read never
+    references a person it did not load.
+    """
+    graph = FamilyGraph()
+
+    for row in conn.execute(
+        'SELECT id, given, surname, sex, birth, death, living FROM person '
+        'ORDER BY id LIMIT ?',
+        (limit,),
+    ):
+        graph.add_person(_person_from_row(row))
+
+    _load_relationships_into(conn, graph)
+
     log.info('Loaded %d people, %d parent links, %d unions, %d birth-order answers.',
              len(graph.people), sum(len(v) for v in graph.parents.values()),
              len(graph.unions), len(graph.birth_order))
     return graph
+
+
+# ── reading a window of the tree lives in Tree.storage.reads ─────────────────────
+# window_ids / load_windowed_graph / page_people are in Tree/storage/reads.py so this module
+# stays under the project's 500-line limit. They reuse _person_from_row and
+# _load_relationships_into from here.
 
 
 # ── writing people ──────────────────────────────────────────────────────────────
@@ -152,13 +176,7 @@ def get_person(conn: sqlite3.Connection, person_id: int) -> Person | None:
     ).fetchone()
     if row is None:
         return None
-    return Person(
-        id=row['id'], given=str(row['given'] or ''), surname=str(row['surname'] or ''),
-        sex=_sex(row['sex']), birth=DateValue.parse(row['birth']),
-        death=DateValue.parse(row['death']),
-        birth_year=_year(row['birth']), death_year=_year(row['death']),
-        living=_living_bool(row['living']),
-    )
+    return _person_from_row(row)
 
 
 def create_person(conn: sqlite3.Connection, given: str, surname: str = '',
@@ -353,33 +371,78 @@ def record_birth_order(conn: sqlite3.Connection, elder_id: int, younger_id: int)
 
 # ── search and count ────────────────────────────────────────────────────────────
 def search_people(conn: sqlite3.Connection, query: str, limit: int = 50) -> list[Person]:
-    """People whose given or surname contains ``query``, case-insensitively.
+    """People whose given OR surname *begins with* ``query``, case-insensitively.
 
-    A substring match over both name columns. It works with Telugu text as well as Latin:
-    SQLite's ``LIKE`` is case-insensitive only for ASCII, but the match is a substring test on
-    the raw characters, so a Telugu query finds the Telugu names that contain it, and a Latin
-    query is matched case-insensitively via ``LOWER`` on both sides.
+    Prefix matching, not the old ``LIKE '%q%'`` substring scan. A leading ``%`` forces SQLite
+    to read every row — the ``ix_person_given`` / ``ix_person_surname`` NOCASE indexes cannot
+    be used for it — which is exactly the full scan this round removes. A prefix (``q%``) is a
+    range the index serves directly, so search stays fast at ten thousand people.
+
+    It still works with Telugu as well as Latin: the NOCASE collation folds only ASCII, so a
+    Latin query matches case-insensitively and a Telugu query matches on the raw characters;
+    both are anchored at the start of a name. The two columns are queried separately and the
+    ids unioned so BOTH indexes are available to the planner, rather than an ``OR`` across
+    columns that no single index covers.
     """
     needle = (query or '').strip()
     if not needle:
         return []
-    pattern = f'%{needle.lower()}%'
+    # Escape LIKE wildcards in the user's text so a '%' or '_' in a name is matched literally.
+    escaped = needle.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    prefix = f'{escaped}%'
     rows = conn.execute(
-        'SELECT id, given, surname, sex, birth, death, living FROM person '
-        'WHERE LOWER(given) LIKE ? OR LOWER(surname) LIKE ? '
-        'ORDER BY given, surname, id LIMIT ?',
-        (pattern, pattern, limit),
+        "SELECT id, given, surname, sex, birth, death, living FROM person "
+        "WHERE id IN ("
+        "  SELECT id FROM person WHERE given LIKE ? ESCAPE '\\' "
+        "  UNION "
+        "  SELECT id FROM person WHERE surname LIKE ? ESCAPE '\\'"
+        ") "
+        "ORDER BY given, surname, id LIMIT ?",
+        (prefix, prefix, limit),
     ).fetchall()
-    return [
-        Person(
-            id=row['id'], given=str(row['given'] or ''), surname=str(row['surname'] or ''),
-            sex=_sex(row['sex']), birth=DateValue.parse(row['birth']),
-            death=DateValue.parse(row['death']),
-            birth_year=_year(row['birth']), death_year=_year(row['death']),
-            living=_living_bool(row['living']),
-        )
-        for row in rows
-    ]
+    return [_person_from_row(row) for row in rows]
+
+
+def page_people(conn: sqlite3.Connection, limit: int,
+                after: tuple[str, str, int] | None = None,
+                q: str | None = None) -> tuple[list[Person], bool]:
+    """One keyset page of people, ordered by ``(given, surname, id)``.
+
+    Cursor pagination, not offset: the page starts strictly after the ``(given, surname, id)``
+    tuple the previous page ended on, so inserts and deletes between pages never skip or repeat
+    a row the way an OFFSET does. ``after`` is that tuple, decoded from the opaque cursor by the
+    route; ``None`` starts at the beginning. An optional ``q`` restricts the page to a name
+    prefix, matched the same way :func:`search_people` matches, so a filtered list paginates too.
+
+    Returns ``(people, has_more)``. One extra row beyond ``limit`` is fetched to learn whether a
+    further page exists without a second COUNT; it is dropped before returning.
+    """
+    clauses: list[str] = []
+    params: list[object] = []
+    if q:
+        needle = q.strip()
+        if needle:
+            escaped = needle.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            prefix = f'{escaped}%'
+            clauses.append("(given LIKE ? ESCAPE '\\' OR surname LIKE ? ESCAPE '\\')")
+            params.extend((prefix, prefix))
+    if after is not None:
+        # Keyset seek: the row tuple must sort strictly after the cursor tuple, in the same
+        # (given, surname, id) order the page is sorted by. Written as the lexicographic
+        # expansion rather than SQLite's row-value comparison so it reads on every version.
+        clauses.append('(given > ? OR (given = ? AND surname > ?) '
+                        'OR (given = ? AND surname = ? AND id > ?))')
+        g, s, i = after
+        params.extend((g, g, s, g, s, i))
+    where = f'WHERE {" AND ".join(clauses)}' if clauses else ''
+    params.append(limit + 1)
+    rows = conn.execute(
+        f'SELECT id, given, surname, sex, birth, death, living FROM person '
+        f'{where} ORDER BY given, surname, id LIMIT ?',
+        params,
+    ).fetchall()
+    has_more = len(rows) > limit
+    return [_person_from_row(row) for row in rows[:limit]], has_more
 
 
 def count_people(conn: sqlite3.Connection) -> int:

@@ -23,12 +23,17 @@ from Tree.storage.people import (
     link_parent,
     link_union,
     load_family_graph,
+    page_people,
     person_exists,
     record_birth_order,
     search_people,
     unlink_parent,
     unlink_union,
     update_person,
+)
+from Tree.storage.reads import (
+    load_windowed_graph,
+    window_ids,
 )
 from Tree.storage.schema import (
     SCHEMA_VERSION,
@@ -57,7 +62,9 @@ __all__ = [
     'load_family_graph',
     'load_tree_settings',
     'load_vocabulary',
+    'load_windowed_graph',
     'open_database',
+    'page_people',
     'person_exists',
     'pin_term',
     'record_birth_order',
@@ -67,4 +74,5 @@ __all__ = [
     'unlink_union',
     'unpin_term',
     'update_person',
+    'window_ids',
 ]
