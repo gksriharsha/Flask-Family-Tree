@@ -8,6 +8,7 @@
      shell.css   — top bar, search, segment toggle, three-column body, rails, phone layout
      tree.css    — bounded canvas, cards, wires, panning, lineage, view-all gcanvas
      rail.css    — right-rail internals, buttons, action stack, notices, full-screen states
+     photos.css  — the photo panel (right rail)
      sheet.css   — the add/edit person sheet
      import.css  — the GEDCOM importer control
 */
@@ -15,5 +16,6 @@
 @import './shell.css';
 @import './tree.css';
 @import './rail.css';
+@import './photos.css';
 @import './sheet.css';
 @import './import.css';

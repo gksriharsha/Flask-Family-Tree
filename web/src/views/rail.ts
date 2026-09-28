@@ -1,5 +1,6 @@
 import type { PersonNode, Relationship } from '../api';
 import { person, state } from '../state';
+import { renderPhotoPanel } from './photos';
 
 const escape = (text: string): string =>
   text.replace(/[&<>"']/g, (c) =>
@@ -180,5 +181,7 @@ export function renderRail(): string {
       ${multi}
 
       ${actions(p)}
+
+      ${renderPhotoPanel(p.id)}
     </div>`;
 }
