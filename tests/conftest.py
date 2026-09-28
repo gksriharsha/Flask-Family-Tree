@@ -2,6 +2,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Point runtime data at a temp location before Tree.config is imported.
@@ -15,3 +17,17 @@ os.environ.setdefault('INJECT_GROOVY_AT_STARTUP', '0')
 # database by mistake does not fail, it silently writes into a real family tree. That happened.
 # Any test needing the store must mock it; anything that slips through now raises instead.
 os.environ['GREMLIN_DATABASE_URI'] = 'ws://127.0.0.1:9/gremlin'
+
+
+@pytest.fixture()
+def make_synthetic_family():
+    """Factory fixture: call ``make_synthetic_family(n_people, seed=0)`` for a fresh tree.
+
+    A factory rather than a fixed graph, because different tests want different sizes -- a
+    correctness test wants a few dozen people, a perf test wants ten thousand -- and building
+    the ten-thousand-person tree for every test that only needs a small one would be waste.
+    See :func:`tests.fixtures.synthetic_tree.build_synthetic_family`.
+    """
+    from tests.fixtures.synthetic_tree import build_synthetic_family
+
+    return build_synthetic_family
