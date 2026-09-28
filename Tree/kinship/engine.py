@@ -35,6 +35,26 @@ class _Route:
         return len(self.path) - 1
 
 
+#: Attribute name for the per-instance ancestor-routes memo. Underscored and set with
+#: ``object.__setattr__``-free assignment (FamilyGraph is a plain, non-frozen dataclass) so it
+#: never collides with a real field and is never part of equality or the repr.
+_ROUTES_CACHE_ATTR = '_ancestor_routes_cache'
+
+
+def _routes_cache(graph: FamilyGraph) -> dict[tuple[int, int], list[_Route]]:
+    """The graph instance's ancestor-routes cache, created on first use.
+
+    Scoped to the instance because a FamilyGraph is built once per request and thrown away;
+    that is exactly the lifetime the memo should have. ``rebuild_indexes`` clears it so an
+    in-place mutation cannot leave a stale route behind.
+    """
+    cache = getattr(graph, _ROUTES_CACHE_ATTR, None)
+    if cache is None:
+        cache = {}
+        setattr(graph, _ROUTES_CACHE_ATTR, cache)
+    return cache
+
+
 def ancestor_routes(graph: FamilyGraph, person_id: int,
                     cap: int = DEFAULT_DEPTH_CAP) -> list[_Route]:
     """Every ancestor reachable from ``person_id``, keyed per *kind* of route.
@@ -42,24 +62,42 @@ def ancestor_routes(graph: FamilyGraph, person_id: int,
     Keyed on the ancestor AND on whether the route passed through a non-birth link, so a
     person reachable both by birth and by adoption keeps both routes. Keying on the ancestor
     alone lets the shorter route delete the other one, which silently loses a real
-    relationship — the kind of thing that makes an app look like it is contradicting itself.
-    """
-    best: dict[tuple[int, bool], _Route] = {}
+    relationship -- the kind of thing that makes an app look like it is contradicting itself.
 
-    def walk(current: int, path: tuple[int, ...], adoptive: bool) -> None:
+    The walk is iterative rather than recursive: a deep tree at a high ``cap`` would otherwise
+    risk Python's recursion limit, and a batch over a ten-thousand-person tree walks this path
+    ten thousand times. Results are memoised per ``(person_id, cap)`` on the graph instance --
+    a graph is rebuilt per request, so the cache lives and dies with one request, and any
+    in-place mutation between queries is the caller's cue to call
+    :meth:`FamilyGraph.rebuild_indexes`, which also clears it.
+    """
+    cache = _routes_cache(graph)
+    cached = cache.get((person_id, cap))
+    if cached is not None:
+        return cached
+
+    best: dict[tuple[int, bool], _Route] = {}
+    # Explicit stack of frames to expand, replacing the recursive `walk`. Each frame is the
+    # same triple the recursive call carried: the current node, the path that reached it, and
+    # whether that path has already left the birth line.
+    stack: list[tuple[int, tuple[int, ...], bool]] = [(person_id, (person_id,), False)]
+    while stack:
+        current, path, adoptive = stack.pop()
         if len(path) - 1 > cap:
-            return
+            continue
         key = (current, adoptive)
         seen = best.get(key)
         if seen is None or len(seen.path) > len(path):
             best[key] = _Route(current, path, adoptive)
-        for link in graph.parent_links(current):
+        for link in reversed(graph.parent_links(current)):
             if link.parent_id in path:      # cycle guard
                 continue
-            walk(link.parent_id, (*path, link.parent_id), adoptive or not link.is_birth)
+            stack.append((link.parent_id, (*path, link.parent_id),
+                          adoptive or not link.is_birth))
 
-    walk(person_id, (person_id,), False)
-    return list(best.values())
+    routes = list(best.values())
+    cache[(person_id, cap)] = routes
+    return routes
 
 
 def _build(graph: FamilyGraph, subject: int, other: int,
@@ -132,10 +170,69 @@ def relationships(graph: FamilyGraph, subject: int, other: int,
         return [Kinship(kind='none')]
 
     ups = ancestor_routes(graph, subject, cap)
-    downs = ancestor_routes(graph, other, cap)
     by_ancestor: dict[int, list[_Route]] = {}
     for route in ups:
         by_ancestor.setdefault(route.ancestor_id, []).append(route)
+    return _relationships_with_ups(graph, subject, other, cap, ups, by_ancestor,
+                                   _allow_spouse_hop=_allow_spouse_hop)
+
+
+def closest(graph: FamilyGraph, subject: int, other: int,
+            cap: int = DEFAULT_DEPTH_CAP) -> Kinship:
+    """The single nearest relationship — for a compact label where only one fits."""
+    return relationships(graph, subject, other, cap)[0]
+
+
+def relationships_from_root(graph: FamilyGraph, root_id: int,
+                            cap: int = DEFAULT_DEPTH_CAP) -> dict[int, list[Kinship]]:
+    """Every person's relationship to one root, computed in a single pass.
+
+    This is the batch form of calling ``relationships(graph, root_id, pid)`` for every ``pid``
+    in the graph, and it returns exactly that: a dict from person id to the same list, in the
+    same order, of the same :class:`Kinship` structs the per-pair call would produce. It is
+    the shape :func:`Tree.api.routes.graph_view` wants -- that view labels every person from
+    one root, and computing the root's ancestor routes once instead of once per person is what
+    turns an O(N^2) page into an O(N * degree) one.
+
+    The saving is real but narrow: the root's up-routes and the ``by_ancestor`` map are built
+    once here, and each person's own down-routes still have to be walked (they are, and they
+    are memoised on the graph instance, so a later per-pair call reuses them). Everything else
+    -- the birth/adoptive grouping, the shortest-route selection, the signature dedup, the
+    one-hop affinal spouse fallback, and the ``self`` / ``none`` special cases -- is identical
+    to :func:`relationships`, deliberately, so the two can never disagree.
+    """
+    if root_id not in graph.people:
+        # Match the per-pair contract: an unknown subject yields 'none' for every 'other'
+        # that exists, and 'none' likewise for the unknown ones. relationships(root, pid)
+        # returns [none] whenever either endpoint is missing.
+        return {pid: [Kinship(kind='none')] for pid in graph.people}
+
+    ups = ancestor_routes(graph, root_id, cap)
+    by_ancestor: dict[int, list[_Route]] = {}
+    for route in ups:
+        by_ancestor.setdefault(route.ancestor_id, []).append(route)
+
+    out: dict[int, list[Kinship]] = {}
+    for other in graph.people:
+        out[other] = _relationships_with_ups(graph, root_id, other, cap, ups, by_ancestor)
+    return out
+
+
+def _relationships_with_ups(graph: FamilyGraph, subject: int, other: int, cap: int,
+                            ups: list[_Route],
+                            by_ancestor: dict[int, list[_Route]],
+                            _allow_spouse_hop: bool = True) -> list[Kinship]:
+    """The body of :func:`relationships`, given the subject's up-routes already computed.
+
+    Factored out so the batch path can share one computation of the root's routes across every
+    ``other`` while remaining, line for line, the same algorithm the per-pair function runs.
+    """
+    if subject == other:
+        return [Kinship(kind='self')]
+    if subject not in graph.people or other not in graph.people:
+        return [Kinship(kind='none')]
+
+    downs = ancestor_routes(graph, other, cap)
 
     candidates: list[tuple[_Route, _Route]] = []
     for down in downs:
@@ -175,12 +272,6 @@ def relationships(graph: FamilyGraph, subject: int, other: int,
             results.append(built)
 
     return results or [Kinship(kind='none')]
-
-
-def closest(graph: FamilyGraph, subject: int, other: int,
-            cap: int = DEFAULT_DEPTH_CAP) -> Kinship:
-    """The single nearest relationship — for a compact label where only one fits."""
-    return relationships(graph, subject, other, cap)[0]
 
 
 def unresolved_seniority(links: list[Kinship]) -> tuple[int, int] | None:

@@ -3,6 +3,7 @@
 from Tree.kinship.engine import (
     closest,
     relationships,
+    relationships_from_root,
     unresolved_seniority,
 )
 from Tree.kinship.model import (
@@ -39,6 +40,7 @@ __all__ = [
     'closest',
     'explain',
     'relationships',
+    'relationships_from_root',
     'render_english',
     'render_telugu',
     'unresolved_seniority',

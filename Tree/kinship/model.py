@@ -131,7 +131,28 @@ class Kinship:
 
 @dataclass
 class FamilyGraph:
-    """A snapshot the engine can walk. Built once per request from the graph database."""
+    """A snapshot the engine can walk. Built once per request from the graph database.
+
+    ``parents`` and ``unions`` remain the authoritative record; ``children`` and ``spouses``
+    are *derived* indexes that turn ``children_of`` and ``spouse_ids`` from O(N) / O(unions)
+    scans into O(degree) lookups. That matters because :func:`Tree.api.routes.graph_view`
+    calls the engine once per person against one root, so an O(N) query inside it is O(N^2)
+    over the tree, and at ten thousand people that is what made the page slow.
+
+    The indexes are kept correct three ways, in order of how the graph is actually built:
+
+    * incrementally, in :meth:`add_parent_link` / :meth:`add_union`, which is the normal
+      construction path;
+    * lazily, the first time a query runs against an index that is empty while the underlying
+      record is not -- this covers code that assigns ``people`` / ``parents`` / ``unions``
+      directly and never calls an ``add_*`` method;
+    * explicitly, via :meth:`rebuild_indexes`, for code that mutates the record in place after
+      querying.
+
+    Because ``FamilyGraph()`` with no arguments must keep working and direct field assignment
+    must stay correct, the indexes are plain fields that default to empty and are treated as a
+    cache, never as the source of truth.
+    """
 
     people: dict[int, Person] = field(default_factory=dict)
     #: child id -> the links naming that child's parents
@@ -139,6 +160,10 @@ class FamilyGraph:
     unions: list[Union] = field(default_factory=list)
     #: (lower id, higher id) -> the id of whichever is elder, when a person has said so
     birth_order: dict[tuple[int, int], int] = field(default_factory=dict)
+    #: derived: parent id -> child ids (unsorted; ``children_of`` applies the birth-order sort)
+    children: dict[int, list[int]] = field(default_factory=dict)
+    #: derived: person id -> spouse ids, in union-insertion order
+    spouses: dict[int, list[int]] = field(default_factory=dict)
 
     # ---- construction -------------------------------------------------------
     def add_person(self, person: Person) -> None:
@@ -146,12 +171,57 @@ class FamilyGraph:
 
     def add_parent_link(self, link: ParentLink) -> None:
         self.parents.setdefault(link.child_id, []).append(link)
+        # Keep the children index in step. Dedup on (parent, child): a child reachable from
+        # one parent by two links (e.g. a birth link plus a later correction) must still
+        # appear once under that parent, exactly as the old ``any(...)`` scan produced.
+        kids = self.children.setdefault(link.parent_id, [])
+        if link.child_id not in kids:
+            kids.append(link.child_id)
 
     def add_union(self, union: Union) -> None:
         self.unions.append(union)
+        # A union is symmetric, so index it from both sides. Dedup so a repeated union does
+        # not list the same spouse twice.
+        a_spouses = self.spouses.setdefault(union.a_id, [])
+        if union.b_id not in a_spouses:
+            a_spouses.append(union.b_id)
+        b_spouses = self.spouses.setdefault(union.b_id, [])
+        if union.a_id not in b_spouses:
+            b_spouses.append(union.a_id)
 
     def record_birth_order(self, elder_id: int, younger_id: int) -> None:
         self.birth_order[_pair(elder_id, younger_id)] = elder_id
+
+    def rebuild_indexes(self) -> None:
+        """Recompute the derived ``children`` / ``spouses`` indexes from the record.
+
+        Call this after assigning ``parents`` / ``unions`` directly, or after mutating either
+        in place. It is idempotent and never touches the authoritative fields.
+        """
+        children: dict[int, list[int]] = {}
+        for child_id, links in self.parents.items():
+            for link in links:
+                kids = children.setdefault(link.parent_id, [])
+                if child_id not in kids:
+                    kids.append(child_id)
+        self.children = children
+
+        spouses: dict[int, list[int]] = {}
+        for union in self.unions:
+            a_spouses = spouses.setdefault(union.a_id, [])
+            if union.b_id not in a_spouses:
+                a_spouses.append(union.b_id)
+            b_spouses = spouses.setdefault(union.b_id, [])
+            if union.a_id not in b_spouses:
+                b_spouses.append(union.a_id)
+        self.spouses = spouses
+
+        # The kinship engine memoises ancestor routes on this instance (see
+        # Tree.kinship.engine). A rebuild means the record changed, so that memo is now stale;
+        # drop it by name rather than importing the engine (which imports this module).
+        for attr in ('_ancestor_routes_cache',):
+            if hasattr(self, attr):
+                delattr(self, attr)
 
     # ---- queries ------------------------------------------------------------
     def parent_links(self, child_id: int) -> list[ParentLink]:
@@ -164,12 +234,16 @@ class FamilyGraph:
         ]
 
     def children_of(self, parent_id: int) -> list[int]:
-        found = [
-            child_id for child_id, links in self.parents.items()
-            if any(link.parent_id == parent_id for link in links)
-        ]
+        # Lazily populate the index if someone built the graph by assigning ``parents``
+        # directly (bypassing ``add_parent_link``). "Empty index but non-empty record" is the
+        # only signal we have, and it is the right one: a genuinely childless graph has an
+        # empty record too, so the rebuild is a no-op.
+        if not self.children and self.parents:
+            self.rebuild_indexes()
+        found = self.children.get(parent_id, ())
         # Unknown birth years sort last, in a stable order, rather than by a number
-        # that does not exist.
+        # that does not exist. Sorting at query time (not at insert time) keeps the order
+        # correct even when a person's dates are added after their parent link.
         return sorted(found, key=lambda cid: (
             self.people[cid].birth_date.sort_year is None,
             self.people[cid].birth_date.sort_year or 0,
@@ -177,13 +251,9 @@ class FamilyGraph:
         ))
 
     def spouse_ids(self, person_id: int) -> list[int]:
-        out = []
-        for union in self.unions:
-            if union.a_id == person_id:
-                out.append(union.b_id)
-            elif union.b_id == person_id:
-                out.append(union.a_id)
-        return out
+        if not self.spouses and self.unions:
+            self.rebuild_indexes()
+        return list(self.spouses.get(person_id, ()))
 
     def spouse_of(self, person_id: int) -> int | None:
         found = self.spouse_ids(person_id)
