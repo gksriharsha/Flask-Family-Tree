@@ -15,8 +15,14 @@
  */
 import { state } from '../state';
 
-const DESCENT = '#8FAE66';
-const UNION = '#B08A63';
+/* Connector strokes come from the :root tokens, so they can never drift from the palette.
+   Read once at module load; the literal is only a fallback for a non-DOM (test) context. */
+const cssVar = (name: string, fallback: string): string => {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+};
+const DESCENT = cssVar('--wire-descent', '#8fae66');
+const UNION = cssVar('--wire-union', '#b08a63');
 
 export function drawWires(root: HTMLElement): void {
   const canvases = root.querySelectorAll<HTMLElement>('.canvas-in');

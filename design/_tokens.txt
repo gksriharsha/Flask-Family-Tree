@@ -1,3 +1,14 @@
 Shared token block, pasted into each artboard's <helmet> (artboards share nothing at runtime).
 Derived from the existing app: blue #1261bb (primary/interactive), orange #f88e37 (warning),
 green #4d8519 (lineage), brown #aa4c0d (adoptive), ground #f2f2f2 -> warmed toward the olive.
+
+Contrast adjustments (design/polish, WCAG 2.1 AA — 4.5:1 for normal text):
+- --muted darkened #6b7563 -> #606959. As small secondary text it fell below AA on the
+  lightest grounds it lands on: 3.82:1 on --sunk (#e2e7d6), 3.99:1 on --surface-2, 4.24:1 on
+  --paper. The new value clears 4.5:1 on all of them (4.54 / 4.73 / 5.04) with a shift small
+  enough to leave the muted voice intact.
+- --amber darkened #a45c0e -> #9b570d. As text on --paper it was 4.48:1, a hair under AA; the
+  new value is 4.90:1. Amber is mostly a fill/rule (the .warn band, the birth-order dot), so
+  the change is barely visible but makes any amber text compliant.
+All other primary-voice colours (olive/brown/blue) already clear AA as text on every ground
+they appear on, so they are unchanged. The web app's :root mirrors these values verbatim.

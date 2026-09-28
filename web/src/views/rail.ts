@@ -1,5 +1,6 @@
 import type { PersonNode, Relationship } from '../api';
 import { person, state } from '../state';
+import { renderPhotoPanel } from './photos';
 
 const escape = (text: string): string =>
   text.replace(/[&<>"']/g, (c) =>
@@ -83,7 +84,7 @@ function relationshipBox(p: PersonNode, link: Relationship, index: number): stri
          <span class="al-l">Also called &mdash; tap one to always use it for ${escape(p.given)}</span>
          ${link.alternatives
            .map(
-             (alt, i) => `<button data-pin="${index}:${i}" class="${alt.added_by_family ? 'added' : ''}">
+             (alt, i) => `<button data-pin="${index}:${i}" class="${alt.added_by_family ? 'is-added' : ''}">
                  <span class="al-te">${escape(alt.term)}</span>
                  <span class="al-u">${escape(alt.usage)}</span>
                </button>`,
@@ -107,7 +108,7 @@ function relationshipBox(p: PersonNode, link: Relationship, index: number): stri
         <span class="tag">EN</span>
         <span><span class="val">${escape(link.en)}</span></span>
       </div>
-      <div class="kinrow hl">
+      <div class="kinrow is-hl">
         <span class="tag">తెలుగు</span>
         <span>
           <span class="val te">${escape(link.te)}</span>
@@ -156,7 +157,7 @@ export function renderRail(): string {
          <input id="word-use" placeholder="Who says it — optional" aria-label="Who says it" />
          <div class="row">
            <button class="btn" data-saveword>Add</button>
-           <button class="btn quiet" data-cancelword>Cancel</button>
+           <button class="btn is-muted" data-cancelword>Cancel</button>
          </div>
        </div>`
     : '';
@@ -180,5 +181,7 @@ export function renderRail(): string {
       ${multi}
 
       ${actions(p)}
+
+      ${renderPhotoPanel(p.id)}
     </div>`;
 }

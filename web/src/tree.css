@@ -1,0 +1,178 @@
+/* ── the tree canvas ─────────────────────────────────────────────────── */
+/* The tree is moved by transforming its contents, so the canvas itself never scrolls. */
+.canvas {
+  position: relative; overflow: hidden; background: var(--paper);
+  background-image: radial-gradient(var(--rule-soft) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.canvas-in {
+  position: relative; width: max-content; min-width: 100%;
+  padding: 34px 40px 60px; will-change: transform;
+}
+/* Behind the cards, never in the way of a click. */
+.wires { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.canvas-in > *:not(.wires) { position: relative; z-index: 1; }
+.genrow { display: flex; justify-content: center; }
+.branchrow { position: relative; display: flex; align-items: flex-start; justify-content: center; gap: 30px; }
+.branch { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 26px; }
+
+.kidrow { position: relative; display: flex; align-items: stretch; gap: 14px; padding-top: 24px; }
+.kid { position: relative; display: flex; flex-direction: column; align-items: stretch; }
+.kid > .card { flex: 1; }
+
+.couple { display: flex; align-items: stretch; }
+/* Spacer only: the union's double rule is drawn in the wire layer. */
+.knot { flex: none; align-self: center; width: 26px; height: 0; }
+
+/* Cards are flex columns so the kinship chip can be pushed to the bottom, which puts every
+   chip in a row on one baseline and keeps a long name from making its card taller. */
+.card {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start;
+  width: 172px; padding: 9px 10px 10px;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-3);
+  text-align: left; transition: box-shadow 0.12s, border-color 0.12s;
+}
+.card:hover { border-color: var(--olive-line); box-shadow: 0 1px 4px rgb(var(--ink-rgb) / 9%); }
+.card.is-compact { width: 150px; padding: 7px 9px 8px; }
+.card.is-sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-soft); }
+.card.is-sel::after { content: ''; position: absolute; left: -1px; top: 6px; bottom: 6px; width: 3px; background: var(--blue); border-radius: var(--r-1); }
+.card.is-focus { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive-soft); }
+.card.is-adopt { border-style: dashed; border-color: var(--brown); }
+
+.card-top { display: flex; align-items: baseline; gap: 6px; }
+.sym { flex: none; width: 8px; height: 8px; margin-top: 5px; border: 1.5px solid var(--muted); }
+.sym.female { border-radius: 50%; }
+.nm { display: block; font-family: var(--serif); font-size: 14.5px; font-weight: 600; line-height: 1.2; text-wrap: balance; }
+.card .cte { display: block; margin-top: 1px; font-family: var(--telugu); font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
+.yrs { display: block; margin: 3px 0 8px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.kin {
+  display: inline-flex; align-items: center; margin-top: auto; padding: 3px 7px;
+  font-size: 11px; font-weight: 600; line-height: 1.3;
+  color: var(--olive); background: var(--olive-soft); border-radius: var(--r-2);
+}
+.kin.is-open { color: var(--blue); background: var(--blue-soft); border: 1px dashed var(--blue); }
+.links { display: block; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--olive); }
+.links::before { content: '⁂'; margin-right: 4px; opacity: 0.75; }
+
+.chip-adopt, .rootpin {
+  position: absolute; top: -9px; display: inline-flex; align-items: center; height: 16px;
+  padding: 0 5px; font-size: 9.5px; font-weight: 700; line-height: 1; letter-spacing: 0.06em;
+  text-transform: uppercase; white-space: nowrap; border-radius: var(--r-2);
+}
+.chip-adopt { right: 8px; color: var(--brown); background: var(--brown-soft); border: 1px solid var(--brown); }
+.rootpin { left: 8px; color: var(--on-accent); background: var(--olive); }
+
+.expand {
+  margin-top: 12px; padding: 3px 10px;
+  border: 1px dashed var(--olive-line); border-radius: 12px; background: var(--surface);
+  font-size: 11px; font-weight: 600; color: var(--olive);
+}
+.expand:hover { background: var(--olive-soft); }
+
+/* ── panning ─────────────────────────────────────────────────────────────────
+   The canvas moves its own scroll rather than a transform, so the wheel, the
+   scrollbars and keyboard scrolling all still work. */
+.canvas { cursor: grab; }
+.canvas.is-panning { cursor: grabbing; user-select: none; }
+.canvas.is-panning .card, .canvas.is-panning .spouse { pointer-events: none; }
+
+.panhint, .recentre {
+  position: absolute; bottom: 16px; z-index: 5;
+  height: 30px; padding: 0 11px;
+  background: rgb(var(--surface-rgb) / 94%); border: 1px solid var(--rule); border-radius: var(--r-pill);
+  font-size: 11.5px; color: var(--muted);
+}
+.panhint { left: 16px; display: inline-flex; align-items: center; gap: 7px; pointer-events: none; }
+.recentre { right: 16px; font-weight: 600; color: var(--ink-2); }
+.recentre:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+
+/* ── lineage view ───────────────────────────────────────────────────────────
+   One generation is the subject. The person above it is context, the row below
+   is what is being read. */
+.canvas-in.is-lineage { display: flex; flex-direction: column; align-items: center; }
+.lin-focus { display: flex; justify-content: center; }
+.lin-row {
+  position: relative; display: flex; align-items: flex-start; justify-content: center;
+  gap: 30px; padding-top: 62px;
+}
+.lin-kid { position: relative; display: flex; flex-direction: column; align-items: center; }
+.lin-leaf {
+  max-width: 40ch; margin-top: 22px; padding: 12px 14px;
+  border: 1px dashed var(--olive-line); border-radius: var(--r-3); background: var(--surface);
+  text-align: center; font-size: 12.5px; color: var(--ink-2); line-height: 1.55;
+}
+
+.descend {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 11px; padding: 4px 11px;
+  border: 1px dashed var(--olive-line); border-radius: 13px; background: var(--surface);
+  font-size: 11px; font-weight: 600; color: var(--olive);
+}
+.descend:hover { background: var(--olive-soft); }
+.nokids { margin-top: 11px; font-size: 11px; color: var(--muted); }
+
+/* A spouse is a pill, not a card: the line runs through one of the two, and giving
+   both equal weight is what turns a descent chart into an undifferentiated mesh. */
+.spouse {
+  display: inline-flex; align-items: center; gap: 6px; align-self: center;
+  height: 40px; padding: 0 11px;
+  border: 1px solid var(--rule); border-radius: 20px; background: var(--surface-2);
+  text-align: left;
+}
+.spouse:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.spouse.is-sel { border-color: var(--blue); background: var(--blue-soft); }
+.spouse .sym { margin-top: 0; }
+.spouse .sp-nm { display: block; font-size: 11.5px; font-weight: 600; line-height: 1.25; }
+.spouse .sp-kin {
+  display: block; max-width: 13ch; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: var(--telugu); font-size: 11px; color: var(--muted);
+  line-height: 1.3;
+}
+
+/* the line, in the left rail */
+.spine { display: flex; flex-direction: column; gap: 5px; }
+.spine-step {
+  display: flex; align-items: center; gap: 7px; width: 100%; height: 30px; padding: 0 8px;
+  border: 1px solid var(--rule); border-radius: var(--r-2); background: var(--surface);
+  font-size: 12px; font-weight: 600; color: var(--ink-2); text-align: left;
+}
+.spine-step:hover { border-color: var(--olive-line); background: var(--olive-soft); }
+.spine-step.is-here { border-color: var(--olive-line); background: var(--olive-soft); color: var(--olive); }
+.spine-step.is-you .sp-n { color: var(--blue); }
+.spine-step .sp-i {
+  flex: none; width: 14px; text-align: center; font-size: 10px; font-weight: 700;
+  color: var(--muted);
+}
+.spine-step .sp-n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spine-step .sp-k {
+  flex: none; max-width: 9ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--telugu); font-size: 11.5px; font-weight: 400; color: var(--muted);
+}
+
+/* In view-all, the reader's own descent stays outlined so they keep their place. */
+.card.is-ownline { border-color: var(--olive-line); }
+
+@media (max-width: 900px) {
+  .lin-row { gap: 14px; }
+  .panhint { display: none; }
+}
+
+/* ── scalable view-all canvas ────────────────────────────────────────────────
+   The whole tree is laid out in layout space; only the nodes inside the viewport are
+   mounted (see canvas.ts + layout.ts). The viewport is the clip box, the world is the
+   transformed layer that pan/zoom moves, and each .gnode is absolutely positioned by
+   layout coordinates. Cards reuse the same vocabulary as the bounded canvas. */
+.gcanvas { position: relative; flex: 1; min-width: 0; height: 100%; }
+.gcanvas-vp {
+  position: absolute; inset: 0; overflow: hidden; cursor: grab;
+  background: var(--paper);
+  background-image: radial-gradient(var(--rule-soft) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.gcanvas.is-panning .gcanvas-vp { cursor: grabbing; user-select: none; }
+.gcanvas.is-panning .card { pointer-events: none; }
+.gcanvas-world { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+.gcanvas-wires { position: absolute; top: 0; left: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.gcanvas-nodes { position: absolute; top: 0; left: 0; z-index: 1; }
+/* Each node is a fixed box the layout sized; the card fills it. */
+.gnode { position: absolute; }
+.gnode > .card { width: 100%; height: 100%; }

@@ -1,4 +1,5 @@
 import type { GraphResponse, ParentLink, PersonNode, Side, TreeInfo } from './api';
+import type { Photo } from './api_flows';
 import type { PersonDraft } from './views/personform';
 
 export type Lang = 'en' | 'te' | 'both';
@@ -34,6 +35,14 @@ export interface AppState {
   editor: PersonDraft | null;
   search: string;
   searchResults: { ID: number; Firstname: string; Lastname?: string }[];
+  /** Photos of the selected person, and whose photos they are, so a stale list is not shown
+   *  against a freshly-selected person while the new fetch is in flight. */
+  photos: Photo[];
+  photosFor: number | null;
+  /** True while a photo upload/delete is in flight, to disable the controls. */
+  photoBusy: boolean;
+  /** The photo id awaiting delete confirmation, or null. */
+  confirmingPhotoDelete: number | null;
 }
 
 export const state: AppState = {
@@ -58,6 +67,10 @@ export const state: AppState = {
   editor: null,
   search: '',
   searchResults: [],
+  photos: [],
+  photosFor: null,
+  photoBusy: false,
+  confirmingPhotoDelete: null,
 };
 
 /* ── derived indexes ────────────────────────────────────────────────────────

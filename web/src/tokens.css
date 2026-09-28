@@ -1,0 +1,103 @@
+/* Design tokens — the single source of truth for colour, type, spacing and radius.
+   Every value below is mirrored in design/_tokens.txt and the artboards' :root. Nothing
+   elsewhere in the stylesheet may hard-code a colour, font or radius: add a token here and
+   reference it, so a drift from the artboards is a one-line diff and never a scattered hunt.
+
+   Derived from the existing app: blue #1261bb stayed the interactive colour, orange stayed
+   the warning colour, and the olive and brown from _colorspace.scss were promoted from
+   decoration to the primary voice. */
+:root {
+  --paper: #eff1ea;
+  --surface: #fafbf7;
+  /* Same colour as --surface, as channels, for an alpha-composited chrome background. */
+  --surface-rgb: 250 251 247;
+  --surface-2: #e7ebde;
+  --sunk: #e2e7d6;
+  --ink: #1a1e15;
+  /* Same colour as --ink, as space-separated channels, so a shadow or scrim can set its own
+     alpha with rgb(var(--ink-rgb) / N%) instead of a hand-copied rgba() literal. */
+  --ink-rgb: 26 30 21;
+  --ink-2: #3d4636;
+  /* --muted darkened from #6b7563 to clear WCAG AA (4.5:1) as text on the lightest ground it
+     lands on (--sunk #e2e7d6 was 3.82:1). See design/_tokens.txt. */
+  --muted: #606959;
+  --rule: #d3d9c6;
+  --rule-soft: #e3e7d8;
+  /* The warm mid rule used for underlined inputs and placeholders — warmer than --muted and
+     lighter than --olive-line, so it earns its own token rather than borrowing either. */
+  --rule-strong: #9aa48d;
+  --olive: #3f6d14;
+  /* Darker olive for the pressed/hover state of an olive fill. */
+  --olive-strong: #365d11;
+  --olive-soft: #e4edd4;
+  --olive-line: #7fa352;
+  /* Readable dark-olive text on --olive-soft tints (notices, multi-note). */
+  --olive-ink: #2b4a0e;
+  --brown: #8f3f0a;
+  --brown-soft: #f4e3d5;
+  /* Readable dark-brown text on warm tints (warning bodies, sheet errors). */
+  --brown-ink: #5e360a;
+  --brown-ink-2: #6d300a;
+  --blue: #1261bb;
+  /* Darker blue for hover/active on a blue fill or link, matching the artboards' a:hover. */
+  --blue-strong: #0e4e96;
+  --blue-soft: #dce8f7;
+  /* A second, slightly deeper blue tint used for the hover of a soft-blue option. */
+  --blue-soft-2: #cfe1f5;
+  /* Readable dark-blue text on --blue-soft (ask-panel body / secondary note). */
+  --blue-ink: #123b6b;
+  --blue-ink-2: #3c5c82;
+  /* --amber darkened from #a45c0e to clear WCAG AA (4.5:1) on --paper (was 4.48:1). */
+  --amber: #9b570d;
+  --amber-soft: #f9e8d4;
+
+  /* Text/icon colour that sits on a saturated fill (blue/olive/brown button, pressed seg). */
+  --on-accent: #fff;
+
+  /* Connector strokes drawn to the wire SVG by canvas.ts / wires.ts. They read these off
+     :root at runtime (getComputedStyle), so the wires stay token-driven like everything else:
+     a soft olive for descent, a muted brown for a union. */
+  --wire-descent: #8fae66;
+  --wire-union: #b08a63;
+
+  /* Radii — every rounded corner comes from one of these. */
+  --r-1: 2px;
+  --r-2: 3px;
+  --r-3: 4px;
+  --r-4: 6px;
+  --r-pill: 15px;
+
+  --serif: 'Faustina', 'Iowan Old Style', Georgia, serif;
+  /* Latin comes from Source Sans; Telugu glyphs fall through to the Telugu face, so a
+     mixed-script string renders correctly without markup. */
+  --sans: 'Source Sans 3', 'Helvetica Neue', Arial, 'Noto Serif Telugu', sans-serif;
+  --telugu: 'Noto Serif Telugu', 'Faustina', serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--blue); text-decoration: none; }
+a:hover { color: var(--blue-strong); text-decoration: underline; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.lbl {
+  margin: 0 0 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.te { font-family: var(--telugu); }
+.tnum { font-variant-numeric: tabular-nums; }

@@ -28,10 +28,35 @@ function closest(target: EventTarget | null, attr: string): HTMLElement | null {
   return (target as HTMLElement | null)?.closest?.(`[${attr}]`) ?? null;
 }
 
+/**
+ * Load the selected person's photographs into state, then re-render. A failure leaves an empty
+ * list rather than blocking selection — the panel then shows its empty state. `photosFor` marks
+ * whose list this is, so a slow fetch cannot paint one person's photos under another.
+ */
+function loadPhotos(id: number, render: () => void): void {
+  state.confirmingPhotoDelete = null;
+  void (async () => {
+    try {
+      const { Photos } = await flowsApi.photos(id);
+      // Ignore a response that arrived after the reader moved on to someone else.
+      if (state.selected !== id) return;
+      state.photos = Photos;
+    } catch {
+      if (state.selected !== id) return;
+      state.photos = [];
+    }
+    state.photosFor = id;
+    render();
+  })();
+}
+
 /** Select a person and, when their relationships were not in the payload, fetch them. */
 function selectPerson(id: number, render: () => void): void {
   state.selected = id;
   state.addingWord = false;
+  state.photosFor = null;
+  state.photos = [];
+  loadPhotos(id, render);
   ensureRelationships(id, render);
   render();
 }
@@ -249,6 +274,36 @@ export function installEvents(hooks: EventHooks): void {
       return;
     }
 
+    const photoDeleteAsk = closest(t, 'data-photodeleteask');
+    if (photoDeleteAsk) {
+      state.confirmingPhotoDelete = Number(photoDeleteAsk.dataset.photodeleteask);
+      render();
+      return;
+    }
+    if (closest(t, 'data-photodeletecancel')) {
+      state.confirmingPhotoDelete = null;
+      render();
+      return;
+    }
+    const photoDelete = closest(t, 'data-photodelete');
+    if (photoDelete) {
+      const photoId = Number(photoDelete.dataset.photodelete);
+      const owner = state.selected;
+      state.photoBusy = true;
+      render();
+      void guard(async () => {
+        try {
+          await flowsApi.deletePhoto(photoId);
+        } finally {
+          state.photoBusy = false;
+          state.confirmingPhotoDelete = null;
+        }
+        if (owner !== null) loadPhotos(owner, render);
+        render();
+      });
+      return;
+    }
+
     const opener = closest(t, 'data-open');
     if (opener) {
       state.open.add(Number(opener.dataset.open));
@@ -276,7 +331,7 @@ export function installEvents(hooks: EventHooks): void {
     const focusStep = closest(t, 'data-focus');
     if (focusStep) {
       state.focus = Number(focusStep.dataset.focus);
-      state.selected = state.focus;
+      selectPerson(state.focus, render);
       resetPan();
       render();
       return;
@@ -401,6 +456,28 @@ export function installEvents(hooks: EventHooks): void {
         (document.getElementById('search') as HTMLInputElement | null)?.focus();
       });
     }, SEARCH_DEBOUNCE_MS);
+  });
+
+  /* ── photo upload (file input fires change, not click) ────────────────────── */
+  root.addEventListener('change', (event) => {
+    const input = event.target as HTMLInputElement;
+    const personId = input.dataset.photoupload;
+    if (input.id !== 'photo-file' || !personId) return;
+    const file = input.files?.[0];
+    if (!file) return;
+    const owner = Number(personId);
+    state.photoBusy = true;
+    render();
+    void guard(async () => {
+      try {
+        // Upload and attach to this person in one call — personId on the upload does both.
+        await flowsApi.uploadPhoto(file, '', owner);
+      } finally {
+        state.photoBusy = false;
+      }
+      loadPhotos(owner, render);
+      render();
+    });
   });
 
   document.addEventListener('keydown', (event) => {
