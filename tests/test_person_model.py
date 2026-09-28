@@ -1,7 +1,5 @@
-from gremlin_python.process.traversal import T
-
 from Tree.model.Event import Event
-from Tree.model.Person import Person
+from Tree.model.Person import Person, T
 
 
 def _round_trip(person):

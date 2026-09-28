@@ -1,43 +1,51 @@
 """The folder a tree lives in.
 
-A tree is created with a location, and everything it holds is kept there as files. The graph
-database is the working index; the folder is the durable copy. That is deliberate — it means
-the tree can be backed up by copying a directory, opened by other genealogy software, and
-rebuilt if the database is ever lost.
+A tree is created with a location, and everything it holds is kept there as files. The SQLite
+database is the working store; the folder is the durable, portable copy. That is deliberate —
+it means the tree can be backed up by copying a directory, opened by other genealogy software,
+and rebuilt if the database is ever lost.
 
     <location>/
         family.ged          GEDCOM 7 · refreshed after every change
         vocabulary.json     the family's own kinship words and pins — not a GEDCOM concept
         media/              photographs and documents
         exports/            on request: family-5.5.1.ged, family.gdz
+
+The tree's own name and folder are kept in the database's ``tree_settings`` table (the SQLite
+equivalent of the graph's old ``TreeSettings`` vertex), read and written through
+:func:`Tree.storage.load_tree_settings` / :func:`Tree.storage.save_tree_settings`.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from gremlin_python.process.graph_traversal import __
-
 from Tree.gedcom.mapping import parse, to_document
 from Tree.gedcom.model import VERSION_7, VERSION_551, MediaObject
 from Tree.gedcom.writer import write_gedcom, write_gedzip
+from Tree.kinship.dates import DateValue
 from Tree.kinship.model import FEMALE, MALE, FamilyGraph
-from Tree.kinship.store import (
-    CHILD_LABEL,
-    ELDER_THAN,
-    PARENT_LABEL,
-    load_family_graph,
-    load_vocabulary,
-)
 from Tree.kinship.vocabulary import MATERNAL, PATERNAL
+from Tree.storage import (
+    load_family_graph,
+    load_tree_settings,
+    load_vocabulary,
+    save_tree_settings,
+)
 
 log = logging.getLogger(__name__)
 
-SETTINGS_LABEL = 'TreeSettings'
+# The keys used inside tree_settings. 'Name' and 'Gedcom_path' mirror the graph vertex's
+# property names, so the meaning is unchanged even though the storage is now a key/value table.
+SETTINGS_NAME = 'Name'
+SETTINGS_PATH = 'Gedcom_path'
+SETTINGS_CREATED = 'Created'
+
 GEDCOM_NAME = 'family.ged'
 VOCABULARY_NAME = 'vocabulary.json'
 MEDIA_DIR = 'media'
@@ -70,33 +78,26 @@ class TreeNotCreated(RuntimeError):
     """No tree has been created yet, so there is nowhere to keep its files."""
 
 
-def _first(value):
-    if isinstance(value, (list, tuple, set)):
-        return next(iter(value), None)
-    return value
-
-
-def load_settings(g) -> TreeSettings | None:
-    rows = g.V().hasLabel(SETTINGS_LABEL).limit(1).elementMap().toList()
-    if not rows:
+def load_settings(conn: sqlite3.Connection) -> TreeSettings | None:
+    settings = load_tree_settings(conn)
+    if not settings:
         return None
-    row = rows[0]
-    location = str(_first(row.get('Gedcom_path')) or '').strip()
+    location = str(settings.get(SETTINGS_PATH) or '').strip()
     if not location:
         return None
-    return TreeSettings(name=str(_first(row.get('Name')) or 'Family Tree'),
+    return TreeSettings(name=str(settings.get(SETTINGS_NAME) or 'Family Tree'),
                         location=Path(location))
 
 
-def require_settings(g) -> TreeSettings:
-    settings = load_settings(g)
+def require_settings(conn: sqlite3.Connection) -> TreeSettings:
+    settings = load_settings(conn)
     if settings is None:
         raise TreeNotCreated(
             'No tree has been created yet. Create one and choose where its files should live.')
     return settings
 
 
-def create_tree(g, name: str, location: str | Path) -> TreeSettings:
+def create_tree(conn: sqlite3.Connection, name: str, location: str | Path) -> TreeSettings:
     """Create the tree and prepare its folder.
 
     The folder is made if it does not exist, and refused if it exists with a tree already in
@@ -106,7 +107,7 @@ def create_tree(g, name: str, location: str | Path) -> TreeSettings:
     path = Path(location).expanduser()
     if path.exists() and not path.is_dir():
         raise ValueError(f'{path} exists and is not a directory.')
-    if (path / GEDCOM_NAME).exists() and load_settings(g) is None:
+    if (path / GEDCOM_NAME).exists() and load_settings(conn) is None:
         raise ValueError(
             f'{path / GEDCOM_NAME} already exists. Import it instead of creating a new tree '
             f'over the top of it.')
@@ -115,19 +116,14 @@ def create_tree(g, name: str, location: str | Path) -> TreeSettings:
     (path / MEDIA_DIR).mkdir(exist_ok=True)
     (path / EXPORTS_DIR).mkdir(exist_ok=True)
 
-    existing = g.V().hasLabel(SETTINGS_LABEL)
-    if existing.hasNext():
-        vertex_id = existing.next().id
-        (g.V(vertex_id).property('Name', name)
-         .property('Gedcom_path', str(path)).iterate())
-    else:
-        (g.addV(SETTINGS_LABEL).property('Name', name)
-         .property('Gedcom_path', str(path))
-         .property('Created', datetime.now(timezone.utc).isoformat())
-         .iterate())
+    fields = {SETTINGS_NAME: name, SETTINGS_PATH: str(path)}
+    existing = load_tree_settings(conn) or {}
+    if SETTINGS_CREATED not in existing:
+        fields[SETTINGS_CREATED] = datetime.now(timezone.utc).isoformat()
+    save_tree_settings(conn, **fields)
 
     settings = TreeSettings(name=name, location=path)
-    export(g, settings)
+    export(conn, settings)
     log.info('Tree %r created at %s', name, path)
     return settings
 
@@ -149,15 +145,15 @@ def _media_objects(settings: TreeSettings) -> list[MediaObject]:
     return found
 
 
-def export(g, settings: TreeSettings | None = None) -> Path:
+def export(conn: sqlite3.Connection, settings: TreeSettings | None = None) -> Path:
     """Refresh the tree's own GEDCOM file and its vocabulary sidecar.
 
     Called after every change, so the folder is never out of date. It is deliberately a
     whole-file rewrite: a family tree is small, and a file that is always complete is worth
     far more than an incremental one that can drift.
     """
-    settings = settings or require_settings(g)
-    family = load_family_graph(g)
+    settings = settings or require_settings(conn)
+    family = load_family_graph(conn)
     document = to_document(family, tree_name=settings.name)
     document.media = _media_objects(settings)
 
@@ -167,7 +163,7 @@ def export(g, settings: TreeSettings | None = None) -> Path:
     # than being smuggled into it as tags no other program would understand.
     payload = {}
     for side in (PATERNAL, MATERNAL):
-        vocab = load_vocabulary(g, side=side)
+        vocab = load_vocabulary(conn, side=side)
         payload[side] = {
             'added': {base: [{'term': v.term, 'roman': v.roman, 'usage': v.usage}
                              for v in variants]
@@ -182,10 +178,11 @@ def export(g, settings: TreeSettings | None = None) -> Path:
     return settings.gedcom
 
 
-def export_as(g, version: str, settings: TreeSettings | None = None) -> Path:
+def export_as(conn: sqlite3.Connection, version: str,
+              settings: TreeSettings | None = None) -> Path:
     """Write a copy in another format, for handing to another program."""
-    settings = settings or require_settings(g)
-    family = load_family_graph(g)
+    settings = settings or require_settings(conn)
+    family = load_family_graph(conn)
     document = to_document(family, tree_name=settings.name)
     document.media = _media_objects(settings)
     settings.exports.mkdir(parents=True, exist_ok=True)
@@ -201,62 +198,85 @@ def export_as(g, version: str, settings: TreeSettings | None = None) -> Path:
 
 
 # ── reading a file back in ──────────────────────────────────────────────────────
-# The label maps live with the graph reader, so the importer and the interactive write
-# path cannot drift apart on how a link is spelled.
+def _stored_sex(sex: str) -> str | None:
+    """The value written to the ``sex`` column. UNKNOWN stores as NULL, matching the store."""
+    return {MALE: 'Male', FEMALE: 'Female'}.get(sex)
 
 
-def write_family_graph(g, family: FamilyGraph) -> dict[int, int]:
-    """Write a parsed tree into the graph. Returns file-id -> vertex-id."""
-    created: dict[int, int] = {}
-    for person in family.people.values():
-        traversal = g.addV('Person').property('Firstname', person.given)
-        if person.surname:
-            traversal = traversal.property('Lastname', person.surname)
-        gender = {MALE: 'Male', FEMALE: 'Female'}.get(person.sex)
-        if gender:
-            traversal = traversal.property('Gender', gender)
-        # Stored in GEDCOM date syntax at whatever precision the file gave. The previous code
-        # wrote `{year}-01-01`, which turned every "about 1955" into a specific January day
-        # that no document ever claimed.
-        if person.birth_date.is_known:
-            traversal = traversal.property('Date_of_birth', person.birth_date.gedcom())
-        if person.death_date.is_known:
-            traversal = traversal.property('Date_of_death', person.death_date.gedcom())
-        created[person.id] = traversal.next().id
+def _date_text(value: DateValue | None) -> str | None:
+    return value.gedcom() if (value is not None and value.is_known) else None
 
+
+def write_family_graph(conn: sqlite3.Connection, family: FamilyGraph) -> dict[int, int]:
+    """Write a parsed tree into the SQLite store in one transaction. Returns file-id -> db-id.
+
+    All the people are inserted with :meth:`executemany`, then all the parent links, unions and
+    birth-order rows the same way, so a ten-thousand-person GEDCOM lands in a single fast
+    transaction rather than one round trip per row. The parsed graph carries file-order ids
+    (1, 2, …); the database assigns its own, so a file-id -> db-id map is built from the people
+    insert and every link is translated through it before it is written.
+    """
+    ordered = sorted(family.people.values(), key=lambda p: p.id)
+
+    # Assign dense db ids starting after the current maximum, so an add-mode import does not
+    # collide with people already present, and executemany can carry the ids explicitly.
+    row = conn.execute('SELECT COALESCE(MAX(id), 0) AS m FROM person').fetchone()
+    base = int(row['m'])
+    file_to_db: dict[int, int] = {}
+    person_rows = []
+    for offset, person in enumerate(ordered, start=1):
+        db_id = base + offset
+        file_to_db[person.id] = db_id
+        person_rows.append((
+            db_id, (person.given or '').strip(), (person.surname or '').strip(),
+            _stored_sex(person.sex), _date_text(person.birth_date),
+            _date_text(person.death_date), None,
+        ))
+
+    parent_rows = []
     for child_id, links in family.parents.items():
-        for link in links:
-            if child_id not in created or link.parent_id not in created:
-                continue
-            parent = family.people[link.parent_id]
-            adoptive = not link.is_birth
-            child = family.people[child_id]
-            # Falls back to the sex-neutral label rather than dropping the link, so a
-            # parent whose sex the file never recorded still connects to their child.
-            parent_label = PARENT_LABEL.get((parent.sex, adoptive),
-                                            'Parent_Of*' if adoptive else 'Parent_Of')
-            child_label = CHILD_LABEL.get((child.sex, adoptive),
-                                          'Child_Of*' if adoptive else 'Child_Of')
-            (g.V(created[link.parent_id]).addE(parent_label)
-             .to(__.V(created[child_id])).iterate())
-            (g.V(created[child_id]).addE(child_label)
-             .to(__.V(created[link.parent_id])).iterate())
-
-    for union in family.unions:
-        if union.a_id not in created or union.b_id not in created:
+        if child_id not in file_to_db:
             continue
-        for one, other in ((union.a_id, union.b_id), (union.b_id, union.a_id)):
-            sex = family.people[one].sex
-            label = {MALE: 'Husband_Of', FEMALE: 'Wife_Of'}.get(sex, 'Partner_Of')
-            (g.V(created[one]).addE(label).to(__.V(created[other])).iterate())
+        for link in links:
+            if link.parent_id in file_to_db:
+                parent_rows.append(
+                    (file_to_db[child_id], file_to_db[link.parent_id], link.role))
 
+    union_rows = []
+    for union in family.unions:
+        if union.a_id in file_to_db and union.b_id in file_to_db:
+            a, b = file_to_db[union.a_id], file_to_db[union.b_id]
+            low, high = (a, b) if a < b else (b, a)
+            union_rows.append((low, high))
+
+    order_rows = []
     for (low, high), elder in family.birth_order.items():
         younger = high if low == elder else low
-        if elder in created and younger in created:
-            (g.V(created[elder]).addE(ELDER_THAN)
-             .to(__.V(created[younger])).iterate())
+        if elder in file_to_db and younger in file_to_db:
+            e, y = file_to_db[elder], file_to_db[younger]
+            lo, hi = (e, y) if e < y else (y, e)
+            order_rows.append((lo, hi, e))
 
-    return created
+    with conn:
+        conn.executemany(
+            'INSERT INTO person (id, given, surname, sex, birth, death, living) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?)', person_rows)
+        if parent_rows:
+            conn.executemany(
+                'INSERT INTO parent_link (child_id, parent_id, role) VALUES (?, ?, ?) '
+                'ON CONFLICT(child_id, parent_id) DO UPDATE SET role = excluded.role',
+                parent_rows)
+        if union_rows:
+            conn.executemany(
+                'INSERT INTO union_link (a_id, b_id) VALUES (?, ?) '
+                'ON CONFLICT(a_id, b_id) DO NOTHING', union_rows)
+        if order_rows:
+            conn.executemany(
+                'INSERT INTO birth_order (lower_id, higher_id, elder_id) VALUES (?, ?, ?) '
+                'ON CONFLICT(lower_id, higher_id) DO UPDATE SET elder_id = excluded.elder_id',
+                order_rows)
+
+    return file_to_db
 
 
 GEDCOM_SUFFIXES = ('.ged', '.gedcom')
@@ -288,35 +308,34 @@ def read_gedcom_text(data: bytes, filename: str = '') -> str:
         raise ValueError('That file is not UTF-8 text, so it cannot be read as GEDCOM.') from exc
 
 
-def clear_people(g) -> int:
+def clear_people(conn: sqlite3.Connection) -> int:
     """Remove every person, and with them every link between people.
 
     Deliberately leaves the tree's settings and the family's vocabulary alone: the words a
     family uses for its relationships are not part of any one imported file, and losing them
-    on an import nobody warned you about would be its own small disaster. Pins go, because a
-    pin is an edge from a person who no longer exists.
+    on an import nobody warned you about would be its own small disaster. Pins go with their
+    people, because a pin points at a person who no longer exists (the foreign key cascades).
     """
-    people = g.V().hasLabel('Person').count().next()
-    if people:
-        g.V().hasLabel('Person').drop().iterate()
-    return int(people)
+    count = conn.execute('SELECT COUNT(*) AS n FROM person').fetchone()['n']
+    with conn:
+        conn.execute('DELETE FROM person')
+    return int(count)
 
 
-def import_document(g, text: str, replace: bool = False) -> dict:
-    """Write a parsed GEDCOM into the graph, in the shape the rest of the app expects.
+def import_document(conn: sqlite3.Connection, text: str, replace: bool = False) -> dict:
+    """Write a parsed GEDCOM into the store, in the shape the rest of the app expects.
 
-    Everything goes in through write_family_graph, which is the same path the seed and the
-    interactive writes use -- so an imported tree gets the declared property keys, the
-    gendered edge labels with their sex-neutral fallbacks, dates at their recorded precision,
-    and the ELDER_THAN edges. Nothing about an imported person is stored differently from one
-    typed in by hand.
+    Everything goes in through :func:`write_family_graph`, the same path the seed uses, so an
+    imported tree carries dates at their recorded precision, roles on parent links, one row per
+    union, and the recorded birth orders. Nothing about an imported person is stored differently
+    from one typed in by hand.
     """
     family, _ = parse(text)
     if not family.people:
         raise ValueError('No people were found in that file. Is it really a GEDCOM?')
 
-    removed = clear_people(g) if replace else 0
-    created = write_family_graph(g, family)
+    removed = clear_people(conn) if replace else 0
+    created = write_family_graph(conn, family)
     log.info('Imported %d people (replace=%s, removed %d)', len(created), replace, removed)
     return {
         'people': len(created),
@@ -327,12 +346,21 @@ def import_document(g, text: str, replace: bool = False) -> dict:
     }
 
 
-def import_file(g, path: str | Path, replace: bool = False) -> dict:
+def import_file(conn: sqlite3.Connection, path: str | Path, replace: bool = False) -> dict:
     """Read a GEDCOM or GEDZIP file from disk. Used by the command line."""
     source = Path(path).expanduser()
     if not source.is_file():
         raise ValueError(f'No file at {source}')
-    summary = import_document(g, read_gedcom_text(source.read_bytes(), source.name),
+    summary = import_document(conn, read_gedcom_text(source.read_bytes(), source.name),
                               replace=replace)
     summary['source'] = str(source)
     return summary
+
+
+# Kept importable for callers that referenced the sex-neutral constant set. The label maps that
+# once lived here belonged to the Gremlin write path, which no longer exists.
+__all__ = [
+    'ARCHIVE_SUFFIXES', 'GEDCOM_SUFFIXES', 'TreeNotCreated', 'TreeSettings',
+    'clear_people', 'create_tree', 'export', 'export_as', 'import_document', 'import_file',
+    'load_settings', 'read_gedcom_text', 'require_settings', 'write_family_graph',
+]

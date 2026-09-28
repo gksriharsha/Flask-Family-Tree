@@ -1,7 +1,20 @@
-from gremlin_python.process.traversal import T
+from enum import Enum
 
 from Tree.model.Event import Event
 from Tree.model.Occupation import Occupation
+
+
+class T(Enum):
+    """Element-map key sentinels.
+
+    These stood in for ``gremlin_python.process.traversal.T`` — the tokens JanusGraph used as
+    the non-string keys of an element map for a vertex's id and label. The graph is gone, but
+    :class:`Person` still round-trips through a plain ``{key: value}`` element map (the GEDCOM
+    import path builds one), so the sentinels stay as the two reserved, non-string keys.
+    """
+
+    id = 'id'
+    label = 'label'
 
 # The graph property names for birth and death facts.
 #

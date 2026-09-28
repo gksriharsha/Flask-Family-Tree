@@ -1,9 +1,5 @@
 # Core runtime. Pinned deliberately: unpinned installs pick up releases that removed APIs
 # this codebase calls (see requirements notes below).
-#
-# gremlinpython 3.8 removed Graph().traversal(), which Tree/__init__.py calls. Staying on the
-# 3.7 line keeps that API; moving to 3.8+ requires migrating to traversal().withRemote().
-gremlinpython>=3.7.2,<3.8
 
 # Pillow 10.0 removed Image.ANTIALIAS, ImageDraw.textsize() and ImageFont.getsize().
 # The call sites have been migrated to Image.Resampling.LANCZOS / textbbox / getbbox, so any

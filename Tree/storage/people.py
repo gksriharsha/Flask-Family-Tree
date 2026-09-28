@@ -131,6 +131,36 @@ def _person_exists(conn: sqlite3.Connection, person_id: int) -> bool:
         'SELECT 1 FROM person WHERE id = ?', (person_id,)).fetchone() is not None
 
 
+def person_exists(conn: sqlite3.Connection, person_id: int) -> bool:
+    """Whether a person with this id is in the tree.
+
+    The public spelling of :func:`_person_exists`, for the routes' existence checks — the
+    storage-backed replacement for the graph's ``g.V(id).hasNext()``.
+    """
+    return _person_exists(conn, person_id)
+
+
+def get_person(conn: sqlite3.Connection, person_id: int) -> Person | None:
+    """Read one person by id, or ``None`` when there is no such person.
+
+    The single-row read the graph store did with ``g.V(id).elementMap()``; used by the face
+    endpoints, which look a person up by the id a recognised encoding resolves to.
+    """
+    row = conn.execute(
+        'SELECT id, given, surname, sex, birth, death, living FROM person WHERE id = ?',
+        (person_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return Person(
+        id=row['id'], given=str(row['given'] or ''), surname=str(row['surname'] or ''),
+        sex=_sex(row['sex']), birth=DateValue.parse(row['birth']),
+        death=DateValue.parse(row['death']),
+        birth_year=_year(row['birth']), death_year=_year(row['death']),
+        living=_living_bool(row['living']),
+    )
+
+
 def create_person(conn: sqlite3.Connection, given: str, surname: str = '',
                   sex: str = UNKNOWN, birth: DateValue | None = None,
                   death: DateValue | None = None, living: bool | None = None) -> int:

@@ -18,10 +18,10 @@ from pathlib import Path
 
 from flask import Blueprint, current_app
 
+from Tree.db import get_db
 from Tree.faces.recognition import UNKNOWN, draw_boxes, recognize_person, relate_person_to_face
-from Tree.model.Person import Person
-from Tree.people.people_Service import retrieve_person_service
-from Tree.relations.gremlin_Interface import get_all_relations
+from Tree.kinship import closest, render_english
+from Tree.storage import get_person, load_family_graph
 from Tree.Utils.http import ApiError, as_vertex_id, as_vertex_ids, json_header, ok
 from Tree.Utils.ImageReducer import reduce
 
@@ -70,11 +70,58 @@ def _store_upload(field='image'):
     return destination
 
 
+def _relations_from(family, root_id):
+    """A ``{person_id: english_label}`` map of everyone related to ``root_id``.
+
+    The graph version returned a fixed set of role buckets (Father, Mother, …); the kinship
+    engine is richer, so this returns the closest genuine relationship to each other person,
+    rendered in English. Unrelated people are omitted.
+    """
+    labels = {}
+    for other_id in family.people:
+        if other_id == root_id:
+            continue
+        link = closest(family, root_id, other_id)
+        if link is not None:
+            labels[other_id] = render_english(link)
+    return labels
+
+
 def _person_response(vertex_id):
-    relations, person_dictionary = retrieve_person_service(vertex_id)
+    conn = get_db()
+    person = get_person(conn, vertex_id)
+    if person is None:
+        raise ApiError('No such person.', status=404)
+    family = load_family_graph(conn)
+    relations = _relations_from(family, vertex_id) if vertex_id in family.people else {}
     return ok('Person found',
-              Data=Person.createPersonObject(person_dictionary).to_dict(),
+              Data={
+                  'ID': person.id,
+                  'Firstname': person.given,
+                  'Lastname': person.surname,
+                  'Gender': person.sex,
+              },
               Relations=relations)
+
+
+def _all_relation_labels(start_id, end_ids):
+    """Map each target id to a human-readable relation label, with the start as 'Me'.
+
+    The storage/kinship replacement for the old Gremlin ``get_all_relations``: the closest
+    genuine relationship from ``start_id`` to each target, in English, or ``None`` when there
+    is no relationship between them.
+    """
+    conn = get_db()
+    family = load_family_graph(conn)
+    relations = {int(start_id): 'Me'}
+    for end_id in end_ids:
+        if start_id in family.people and end_id in family.people:
+            link = closest(family, start_id, end_id)
+            relations[end_id] = render_english(link) if link is not None else None
+        else:
+            relations[end_id] = None
+    return relations
+
 
 
 @faces.route('/search', methods=['POST'])
@@ -157,7 +204,7 @@ def relate():
     end_ids = as_vertex_ids(
         json_header('end_ids'), current_app.config['MAX_RELATION_TARGETS'], field='end_ids',
     )
-    relatives = get_all_relations(start_id=start_id, end_ids=end_ids)
+    relatives = _all_relation_labels(start_id=start_id, end_ids=end_ids)
     _token, _filename, encoded, _locations = draw_boxes(
         img_path=path, relatives_dictionary=relatives, encoded_Image=True,
     )

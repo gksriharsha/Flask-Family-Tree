@@ -33,27 +33,14 @@ class Configuration:
     """Application configuration. Every value is overridable through the environment so the
     same image can run locally and in a deployment without editing source."""
 
-    # --- Gremlin -------------------------------------------------------------
-    GREMLIN_DATABASE_URI = os.environ.get('GREMLIN_DATABASE_URI', 'ws://localhost:8182/gremlin')
-    GREMLIN_TRAVERSAL_SOURCE = os.environ.get('GREMLIN_TRAVERSAL_SOURCE', 'g')
-    # GraphSON 3.0 rather than gremlinpython's default GraphBinary. JanusGraph returns the id of
-    # a vertex property as a GraphBinary *custom* type (its RelationIdentifier), and
-    # gremlinpython's GraphBinary reader has no deserializer for custom types -- so any traversal
-    # returning a Vertex with properties, which includes every `addV(...).next()`, dies with
-    # `KeyError: <DataType.custom: 0>` after the write has already been applied. GraphSON
-    # renders the same value as a string, which the driver handles.
-    GREMLIN_SERIALIZER = os.environ.get('GREMLIN_SERIALIZER', 'graphson')
-    # Reads may legitimately walk a few generations; writes are short. Both are far below the
-    # previous 100 s ceiling, which let one request hold a Gremlin Server thread indefinitely.
-    GREMLIN_READ_TIMEOUT_MS = _env_int('GREMLIN_READ_TIMEOUT_MS', 10000)
-    GREMLIN_WRITE_TIMEOUT_MS = _env_int('GREMLIN_WRITE_TIMEOUT_MS', 10000)
-
-    # functions.groovy is resolved relative to this package, not the process working directory.
-    GROOVY_FUNCTIONS_PATH = PROJECT_ROOT / 'functions.groovy'
-    # Preferred deployment loads the script through Gremlin Server's own ScriptFileGremlinPlugin
-    # so the definitions survive a server restart. Startup injection stays available for local
-    # development against a stock server image.
-    INJECT_GROOVY_AT_STARTUP = _env_bool('INJECT_GROOVY_AT_STARTUP', True)
+    # --- Storage -------------------------------------------------------------
+    # One SQLite file is one family tree. The whole store — people, links, unions, birth
+    # order, vocabulary, settings — lives in this file, so a backup is a copy of the folder it
+    # sits in. Overridable so the same image can point at a mounted volume in a deployment and
+    # a scratch file in a test.
+    DATABASE_PATH = Path(
+        os.environ.get('FAMILYTREE_DB_PATH', DATA_DIR / 'family.sqlite')
+    ).expanduser()
 
     # --- Authentication ------------------------------------------------------
     # A single shared secret. Crude, but the difference between "anyone on the network" and
@@ -87,6 +74,10 @@ class Configuration:
     MAX_RELATION_TARGETS = _env_int('MAX_RELATION_TARGETS', 50)
     RELATION_SEARCH_WORKERS = _env_int('RELATION_SEARCH_WORKERS', 4)
     MAX_SEARCH_RESULTS = _env_int('MAX_SEARCH_RESULTS', 200)
+    # How many people the whole-tree read (/api/v1/graph) loads. A family tree is small, so the
+    # ceiling is high; it exists only so a pathological database cannot ask the process to build
+    # an unbounded structure in memory. The four bulk SELECTs behind it stay fast well past this.
+    MAX_GRAPH_PEOPLE = _env_int('MAX_GRAPH_PEOPLE', 100000)
 
     # --- Geocoding ------------------------------------------------------------
     # Off by default. Coordinate lookup used to happen inline inside POST /add/location by

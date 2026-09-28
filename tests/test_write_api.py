@@ -19,7 +19,6 @@ AUTH = {'X-API-Token': 'test-token'}
 
 class _Config(Configuration):
     API_TOKEN = 'test-token'
-    INJECT_GROOVY_AT_STARTUP = False
     CORS_ALLOWED_ORIGINS = ['http://localhost:4200']
 
 
@@ -238,16 +237,15 @@ TINY_GED = (b'0 HEAD\n1 GEDC\n2 VERS 7.0\n'
 
 @pytest.fixture()
 def stub_import(monkeypatch):
-    """Stand in for the store and the schema pass, so nothing needs a database."""
+    """Stand in for the store, so nothing needs a real database."""
     calls = []
 
-    def fake_import(_g, text, replace=False):
+    def fake_import(_conn, text, replace=False):
         calls.append({'text': text, 'replace': replace})
         return {'people': 1, 'parentLinks': 0, 'unions': 0, 'birthOrder': 0,
                 'replaced': 7 if replace else 0}
 
     monkeypatch.setattr(routes, 'import_document', fake_import)
-    monkeypatch.setattr(routes, '_ensure_schema', lambda: None)
     monkeypatch.setattr(routes, '_refresh_files', lambda: None)
     return calls
 
@@ -310,7 +308,6 @@ def test_an_empty_upload_is_refused(client, stub_import):
 def test_a_file_with_no_people_is_refused(client, monkeypatch):
     """A file that parses to nothing is almost certainly not a GEDCOM, and importing it would
     quietly do nothing at all."""
-    monkeypatch.setattr(routes, '_ensure_schema', lambda: None)
     monkeypatch.setattr(routes, '_refresh_files', lambda: None)
     response = _upload(client, data=b'0 HEAD\n1 GEDC\n2 VERS 7.0\n0 TRLR\n')
     assert response.status_code == 400

@@ -21,7 +21,18 @@ than derived from them. Keep it that way. Real family data belongs in your own G
 directory, not in this repository.
 """
 
-from gremlin_python.process.graph_traversal import __
+from Tree.kinship.dates import DateValue
+from Tree.kinship.model import (
+    ADOPTIVE,
+    BIOLOGICAL,
+    FEMALE,
+    MALE,
+    UNKNOWN,
+    FamilyGraph,
+    ParentLink,
+    Person,
+    Union,
+)
 
 # Every date uses the ``Date_of_birth`` spelling, which is the casing the readers and
 # functions.groovy expect and which the write path now also uses.
@@ -156,23 +167,61 @@ EDGES = [
     ('addV28', 'Daughter_Of', 'addV27'),
 ]
 
-def reset(g):
-    """Drop every vertex. Used by ``familytree reset`` and by test setup."""
-    g.V().drop().iterate()
+def reset(conn):
+    """Delete every person, and with them every link. Used by ``familytree reset`` and tests."""
+    with conn:
+        conn.execute('DELETE FROM person')
 
 
-def seed(g):
-    """Create the demo family and return a mapping of fixture key -> vertex id."""
-    ids = {}
+# Which gedcom-style edge labels the seed graph uses, and what each means to the store.
+# The gendered/reverse labels (Son_Of, Daughter_Of, Brother_Of, …) are redundant with these
+# and derivable from shared parents, so only the authoritative direction is written.
+_BIOLOGICAL_PARENT = {'Father_Of', 'Mother_Of'}
+_ADOPTIVE_PARENT = {'Father_Of*', 'Mother_Of*'}
+_UNION = {'Husband_Of'}
+
+_SEX = {'Male': MALE, 'Female': FEMALE}
+
+
+def _family_graph():
+    """Build the demo :class:`FamilyGraph` from PEOPLE and EDGES.
+
+    Ids are assigned in PEOPLE insertion order (1-based), so the fixture keys map to stable
+    integer ids. Parent links come from the ``*_Of`` (parent -> child) labels; unions from
+    ``Husband_Of``; the reverse and sibling labels are ignored because the store derives those
+    facts rather than storing them.
+    """
+    graph = FamilyGraph()
+    key_to_id = {key: index for index, key in enumerate(PEOPLE, start=1)}
+
     for key, props in PEOPLE.items():
-        traversal = g.addV('Person')
-        for name, value in props.items():
-            traversal = traversal.property(name, value)
-        ids[key] = traversal.next().id
+        graph.add_person(Person(
+            id=key_to_id[key],
+            given=str(props.get('Firstname') or ''),
+            surname=str(props.get('Lastname') or ''),
+            sex=_SEX.get(props.get('Gender'), UNKNOWN),
+            birth=DateValue.parse(props.get('Date_of_birth')),
+        ))
 
     for source, label, target in EDGES:
-        # to() takes an anonymous traversal: g.V(...) is a TraversalSource and is rejected.
-        g.V(ids[source]).addE(label).to(__.V(ids[target])).iterate()
+        src, dst = key_to_id[source], key_to_id[target]
+        if label in _BIOLOGICAL_PARENT:
+            graph.add_parent_link(ParentLink(child_id=dst, parent_id=src, role=BIOLOGICAL))
+        elif label in _ADOPTIVE_PARENT:
+            graph.add_parent_link(ParentLink(child_id=dst, parent_id=src, role=ADOPTIVE))
+        elif label in _UNION:
+            graph.add_union(Union(a_id=src, b_id=dst))
 
-    return ids
+    return graph
+
+
+def seed(conn):
+    """Create the demo family in the database and return a mapping of fixture key -> db id."""
+    from Tree.gedcom.store import write_family_graph
+
+    graph = _family_graph()
+    key_to_file_id = {key: index for index, key in enumerate(PEOPLE, start=1)}
+    file_to_db = write_family_graph(conn, graph)
+    return {key: file_to_db[file_id] for key, file_id in key_to_file_id.items()}
+
 
