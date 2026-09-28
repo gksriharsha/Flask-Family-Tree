@@ -16,20 +16,15 @@ import type { PersonNode } from '../api';
 import {
   childrenOf,
   focusId,
-  frame,
   isAdoptedInto,
   label,
   onOwnLine,
-  onRootLine,
   person,
   spouseOf,
   state,
   years,
 } from '../state';
-
-const escape = (text: string): string =>
-  text.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+import { escapeHtml as escape } from '../dom';
 
 function card(p: PersonNode, compact: boolean): string {
   const classes = ['card'];
@@ -137,70 +132,7 @@ function renderLineage(): string {
 }
 
 /* ── view all ──────────────────────────────────────────────────────────────── */
-function couple(aId: number, bId: number | undefined, compact: boolean): string {
-  const a = person(aId);
-  if (!a) return '';
-  const b = bId === undefined ? undefined : person(bId);
-  return `<div class="couple">${card(a, compact)}${
-    b ? `<span class="knot"></span>${card(b, true)}` : ''
-  }</div>`;
-}
-
-function branch(branchId: number): string {
-  const p = person(branchId);
-  if (!p) return '';
-  const kids = childrenOf(branchId);
-  const isOpen = state.open.has(branchId) || onRootLine(branchId);
-  const spouse = isOpen ? spouseOf(branchId) : undefined;
-
-  const kidRow = isOpen && kids.length > 0
-    ? `<div class="kidrow${kids.length > 1 ? ' multi' : ''}">
-         ${kids
-           .map((id) => {
-             const kid = person(id);
-             return kid
-               ? `<div class="kid${kids.length > 1 ? ' tick' : ''}">${card(kid, true)}</div>`
-               : '';
-           })
-           .join('')}
-       </div>`
-    : '';
-
-  const toggle = !isOpen && kids.length > 0
-    ? `<button class="expand" data-open="${branchId}">
-         + ${kids.length} ${kids.length === 1 ? 'child' : 'children'}
-       </button>`
-    : '';
-
-  return `<div class="branch">${couple(branchId, spouse, !onRootLine(branchId))}${kidRow}${toggle}</div>`;
-}
-
-function renderAll(): string {
-  if (state.root === null) return '<div class="state"><p>Nothing to show yet.</p></div>';
-  const { top, branchIds } = frame(state.root);
-  const hasTop = top.length > 0;
-
-  const topRow = hasTop
-    ? `<div class="genrow">${couple(top[0]!, top[1], false)}</div>`
-    : '';
-
-  const rowClasses = ['branchrow'];
-  if (hasTop) rowClasses.push('hastop');
-  if (branchIds.length > 1) rowClasses.push('multi');
-
-  return `
-    <div class="canvas" data-pan>
-      <div class="canvas-in">
-        <svg class="wires" aria-hidden="true"></svg>
-        ${topRow}
-        <div class="${rowClasses.join(' ')}">
-          ${branchIds.map((id) => branch(id)).join('')}
-        </div>
-      </div>
-      ${canvasChrome()}
-    </div>`;
-}
-
+/** The pan hint + recentre button, used by the bounded lineage canvas. */
 function canvasChrome(): string {
   return `
     <div class="panhint">
@@ -212,6 +144,29 @@ function canvasChrome(): string {
       Drag to move the tree
     </div>
     <button class="recentre" data-recentre>Recentre</button>`;
+}
+
+/**
+ * View-all is now the SCALABLE canvas: it hosts every generation of the whole tree and mounts
+ * only the people inside the viewport (see canvas.ts + layout.ts). The old frame — one
+ * grandparent row plus the root's branches — did not scale past a few dozen people, so at ten
+ * thousand it is replaced by the culling canvas. `renderAll` returns only the host element;
+ * main.ts mounts the controller into it after the shell is in the DOM.
+ */
+function renderAll(): string {
+  if (state.root === null) return '<div class="state"><p>Nothing to show yet.</p></div>';
+  if (!state.graph || state.graph.People.length === 0) {
+    return '<div class="state"><p>Nothing to show yet.</p></div>';
+  }
+  // The controller fills this host imperatively; the shell never re-renders its interior.
+  return `<div class="gcanvas-host" data-tree-all></div>`;
+}
+
+/** One person as a canvas node — the same card, without the lineage-specific chrome. */
+export function renderCanvasNode(id: number): string {
+  const p = person(id);
+  if (!p) return '';
+  return card(p, true);
 }
 
 export function renderTree(): string {

@@ -203,6 +203,21 @@ export const api = {
       `/api/v1/search?q=${encodeURIComponent(q)}`,
     ),
 
+  /**
+   * Every genuine relationship between two people, fetched on demand.
+   *
+   * The `/graph` payload carries `relationships` for every person today, so the client rarely
+   * needs this. But a later item makes `/graph` windowed, and a person outside the window will
+   * arrive without their relationships computed; the client then fetches them here for the one
+   * person in focus rather than forcing the server to label all N up front. Keeps working
+   * either way: when the payload already carried them, this is never called.
+   */
+  relationshipTo: (subject: number, other: number, side: Side) =>
+    request<{
+      Relationships: Relationship[];
+      SeniorityQuestion: SeniorityQuestion | null;
+    }>(`/api/v1/people/${subject}/relationship-to/${other}?side=${side}`),
+
   /** Record which of two people was born first — the fact Telugu needs and dates rarely hold. */
   recordBirthOrder: (elderId: number, youngerId: number) =>
     request<{ Message: string }>('/api/v1/birth-order', {
